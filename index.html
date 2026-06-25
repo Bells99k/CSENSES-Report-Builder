@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CSENSES Environmental Report Builder</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="app-shell">
+      <div class="app-brand">
+        <img src="assets/common-senses-logo.png" alt="Common Senses logo">
+        <div>
+        <p class="eyebrow">CSENSES reporting tool</p>
+        <h1>Environmental Sensor Dashboard Builder</h1>
+        </div>
+      </div>
+      <div class="header-actions" aria-label="Report actions">
+        <button id="printBtn" type="button" title="Print or save as PDF">Export PDF</button>
+      </div>
+    </header>
+
+    <main class="builder app-shell">
+      <aside class="controls" aria-label="Report controls">
+        <div hidden>
+          <input id="reportTitle" type="hidden" value="Composite Calendar">
+          <input id="airThreshold" type="hidden" value="35.5">
+          <input id="pm10Threshold" type="hidden" value="155">
+          <input id="heatThreshold" type="hidden" value="80">
+          <input id="noiseThreshold" type="hidden" value="70">
+          <textarea id="generalInfo">Type in your comments/stories/lived experience here</textarea>
+        </div>
+
+        <section>
+          <h2>Data Observer Information</h2>
+          <label>
+            Your name
+            <input id="reportAuthor" type="text" placeholder="Enter your name">
+          </label>
+          <label>
+            Report date
+            <input id="reportDate" type="date" value="2026-06-24">
+          </label>
+        </section>
+
+        <section>
+          <h2>Observation Period and Area</h2>
+          <label>
+            Select month
+            <input id="reportMonth" type="month" value="2026-06">
+          </label>
+          <label>
+            What to Report
+            <select id="calendarMetric">
+              <option value="heat">Heat Index</option>
+              <option value="air">PM₂.₅</option>
+              <option value="pm10">PM₁₀</option>
+              <option value="noise">Noise</option>
+            </select>
+          </label>
+          <label>
+            Sensor or sensor cluster
+            <select id="locationName">
+              <option value="Sample Cluster 1">Sample Cluster 1</option>
+              <option value="Sample Cluster 2">Sample Cluster 2</option>
+              <option value="Sample Cluster 3">Sample Cluster 3</option>
+              <option value="Sample Cluster 4">Sample Cluster 4</option>
+              <option value="Sample Cluster 5">Sample Cluster 5</option>
+            </select>
+          </label>
+        </section>
+
+        <section>
+          <h2>Picture</h2>
+          <label>
+            Choose picture
+            <select id="pictureSelect">
+              <option value="grove">Grove Hall sensor</option>
+              <option value="street">Urban heat corridor</option>
+              <option value="school">Schoolyard sensor node</option>
+              <option value="transit">Transit stop monitor</option>
+            </select>
+          </label>
+          <label>
+            Upload picture
+            <input id="imageUpload" type="file" accept="image/*">
+          </label>
+        </section>
+
+        <section>
+          <h2>Data</h2>
+          <label>
+            Upload sensor CSV
+            <input id="csvUpload" type="file" accept=".csv,text/csv">
+          </label>
+          <p class="hint">Columns can include cluster, sensor_id, date, pm25, pm10, temperature, heat_index, noise, or decibel.</p>
+        </section>
+      </aside>
+
+      <section class="preview-wrap" aria-label="Report preview">
+        <div class="report-page" id="reportPage">
+          <section class="template template-composite is-visible" data-template-panel="composite">
+            <header class="report-header">
+              <div class="report-masthead">
+                <img class="report-logo" src="assets/common-senses-logo.png" alt="Common Senses logo">
+                <p class="report-kicker">COMMON SENSES DATA OBSERVER REPORT</p>
+                <p class="template-label">Template 1</p>
+              </div>
+            </header>
+
+            <div class="report-hero-block">
+              <div class="report-photo-title">
+                <p class="eyebrow">Observation Area</p>
+                <h3 id="reportPhotoTitle">Grove Hall</h3>
+                <p class="report-meta" id="reportMeta">Prepared by Name on June 24, 2026</p>
+              </div>
+              <div class="report-image-panel" aria-label="Selected report picture">
+                <canvas id="sceneCanvasReport" width="640" height="420"></canvas>
+              </div>
+            </div>
+
+            <div class="panel large calendar-panel">
+              <div class="calendar-heading calendar-heatmap-heading">
+                <div class="calendar-title-block">
+                  <h3 id="calendarMonth">June 2026</h3>
+                  <p id="calendarLocation" class="cluster-preview-text">Sample Cluster 1</p>
+                </div>
+                <div class="standards-wrap">
+                  <p class="standards-title" id="standardsTitle">Heat Index</p>
+                  <div class="hi-legend standard-legend" id="standardsGraphic" aria-label="Selected metric standards color scale">
+                    <span class="hi-none">No HI Classification<small>Less than 80°F</small></span>
+                    <span class="hi-caution">Caution<small>80°F - 90°F</small></span>
+                    <span class="hi-extreme-caution">Extreme Caution<small>90°F - 103°F</small></span>
+                    <span class="hi-danger">Danger<small>103°F - 124°F</small></span>
+                    <span class="hi-extreme-danger">Extreme Danger<small>125°F and higher</small></span>
+                  </div>
+                </div>
+              </div>
+              <div class="heatmap-note" id="heatmapNote">Composite hazard severity from uploaded CSV values.</div>
+              <div class="calendar-grid" id="calendarGrid" aria-label="Grid calendar chart"></div>
+            </div>
+
+            <div class="summary-grid heat-summary-grid">
+              <article class="panel summary-card">
+                <p id="metricSummaryLabel">Heat Index exceedance days for <span data-bind="monthShort">June</span>.</p>
+                <strong id="heatSummary">0 exceedance days</strong>
+              </article>
+              <article class="panel summary-card">
+                <p id="peakMetricSummaryLabel">Highest daily average Heat Index for <span data-bind="monthShort">June</span>.</p>
+                <strong id="peakHeatSummary">--</strong>
+              </article>
+              <article class="panel summary-card">
+                <p id="riskMetricSummaryLabel">Danger or Extreme Danger Heat Index days for <span data-bind="monthShort">June</span>.</p>
+                <strong id="dangerHeatSummary">0 days</strong>
+              </article>
+            </div>
+
+            <article class="panel info-panel report-note-panel">
+              <div class="note-toolbar" aria-label="Comment editor tools">
+                <label class="note-tool-select">
+                  <span>Font</span>
+                  <select id="noteFontFamily">
+                    <option value="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Sans Serif</option>
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="'Aptos', 'Segoe UI', sans-serif">Aptos</option>
+                    <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                    <option value="'Palatino Linotype', Palatino, serif">Palatino</option>
+                    <option value="'Courier New', monospace">Monospace</option>
+                    <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                  </select>
+                </label>
+                <label class="note-tool-select">
+                  <span>Size</span>
+                  <select id="noteFontSize">
+                    <option value="14">14</option>
+                    <option value="16">16</option>
+                    <option value="18" selected>18</option>
+                    <option value="20">20</option>
+                    <option value="22">22</option>
+                    <option value="24">24</option>
+                    <option value="26">26</option>
+                  </select>
+                </label>
+                <div class="note-tool-group" aria-label="Text style">
+                  <button class="note-command" type="button" data-command="bold" title="Bold"><strong>B</strong></button>
+                  <button class="note-command" type="button" data-command="italic" title="Italic"><em>I</em></button>
+                  <button class="note-command" type="button" data-command="underline" title="Underline"><u>U</u></button>
+                </div>
+                <div class="note-tool-group" aria-label="Text alignment">
+                  <button class="note-command" type="button" data-command="justifyLeft" title="Align left">Left</button>
+                  <button class="note-command" type="button" data-command="justifyCenter" title="Align center">Center</button>
+                  <button class="note-command" type="button" data-command="justifyRight" title="Align right">Right</button>
+                </div>
+                <button id="noteClearFormat" class="note-command note-clear" type="button" title="Clear formatting">Clear</button>
+              </div>
+              <div id="generalInfoPreview" class="report-note-input" contenteditable="true" role="textbox" aria-label="User note">Type in your comments/stories/lived experience here</div>
+            </article>
+          </section>
+
+          <section class="template template-trends" data-template-panel="trends">
+            <header class="report-header compact">
+              <p class="template-label">Template 2</p>
+              <h2>Sensor Trend Brief</h2>
+              <p id="trendSubhead">Sample Cluster 1 in June 2026</p>
+            </header>
+            <div class="media-band">
+              <canvas id="sceneCanvasTrends" width="960" height="320" aria-label="Selected report image"></canvas>
+            </div>
+            <div class="panel chart-panel">
+              <div class="calendar-heading">
+                <div>
+                  <h3>Daily Sensor Readings</h3>
+                  <p>Daily cluster averages from uploaded CSV or sample data.</p>
+                </div>
+                <div class="legend">
+                  <span><i class="air"></i>PM₂.₅</span>
+                  <span><i class="heat"></i>Heat</span>
+                  <span><i class="noise"></i>Noise</span>
+                </div>
+              </div>
+              <canvas id="trendChart" width="980" height="360" aria-label="Daily sensor line chart"></canvas>
+            </div>
+            <div class="summary-grid metric-row">
+              <article class="panel summary-card"><p>Highest PM₂.₅</p><strong id="maxAir">--</strong></article>
+              <article class="panel summary-card"><p>Highest Heat</p><strong id="maxHeat">--</strong></article>
+              <article class="panel summary-card"><p>Highest Noise</p><strong id="maxNoise">--</strong></article>
+            </div>
+          </section>
+
+          <section class="template template-snapshot" data-template-panel="snapshot">
+            <header class="report-header compact">
+              <p class="template-label">Template 3</p>
+              <h2>Site Snapshot</h2>
+              <p id="snapshotSubhead">Sensor context, hazards, and interpretation notes.</p>
+            </header>
+            <div class="snapshot-layout">
+              <div class="media-card">
+                <canvas id="sceneCanvasSnapshot" width="720" height="620" aria-label="Selected report image"></canvas>
+              </div>
+              <div class="panel snapshot-copy">
+                <h3 id="snapshotLocation">Sample Cluster 1</h3>
+                <p id="snapshotNotes"></p>
+                <table>
+                  <thead>
+                    <tr><th>Hazard</th><th>Threshold</th><th>Days</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>PM₂.₅</td><td id="airThresholdCell">35</td><td id="airDaysCell">0</td></tr>
+                    <tr><td>Heat</td><td id="heatThresholdCell">80</td><td id="heatDaysCell">0</td></tr>
+                    <tr><td>Noise</td><td id="noiseThresholdCell">70</td><td id="noiseDaysCell">0</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <article class="panel info-panel snapshot-bottom">
+              <h3>Recommended interpretation</h3>
+              <p id="recommendationText">Upload a CSV to automatically summarize exceedance patterns for this site.</p>
+            </article>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
