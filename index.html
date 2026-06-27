@@ -25,7 +25,7 @@
         <div hidden>
           <input id="reportTitle" type="hidden" value="Composite Calendar">
           <input id="airThreshold" type="hidden" value="35.5">
-          <input id="pm10Threshold" type="hidden" value="155">
+          <input id="pm10Threshold" type="hidden" value="150">
           <input id="heatThreshold" type="hidden" value="80">
           <input id="noiseThreshold" type="hidden" value="70">
           <textarea id="generalInfo">Type in your comments/stories/lived experience here</textarea>
@@ -40,6 +40,10 @@
           <label>
             Report date
             <input id="reportDate" type="date" value="2026-06-24">
+          </label>
+          <label>
+            Catchphrase
+            <input id="reportCatchphrase" type="text" value="What's going on in Grove Hall?">
           </label>
         </section>
 
@@ -109,6 +113,10 @@
             </header>
 
             <div class="report-hero-block">
+              <div class="report-catchphrase-column">
+                <p class="eyebrow">Catchphrase</p>
+                <h3 id="reportCatchphrasePreview">What's going on in Grove Hall?</h3>
+              </div>
               <div class="report-photo-title">
                 <p class="eyebrow">Observation Area</p>
                 <h3 id="reportPhotoTitle">Grove Hall</h3>

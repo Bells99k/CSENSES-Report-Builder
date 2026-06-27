@@ -1,12 +1,16 @@
 const state = {
   template: "composite",
   rows: [],
-  imageChoice: "street",
+  imageChoice: "grove",
   uploadedImage: null,
+  builtInImages: {},
 };
 
 const els = {
   title: document.getElementById("reportTitle"),
+  author: document.getElementById("reportAuthor"),
+  reportDate: document.getElementById("reportDate"),
+  catchphrase: document.getElementById("reportCatchphrase"),
   location: document.getElementById("locationName"),
   month: document.getElementById("reportMonth"),
   generalInfo: document.getElementById("generalInfo"),
@@ -15,11 +19,13 @@ const els = {
   imageUpload: document.getElementById("imageUpload"),
   csvUpload: document.getElementById("csvUpload"),
   airThreshold: document.getElementById("airThreshold"),
+  pm10Threshold: document.getElementById("pm10Threshold"),
   heatThreshold: document.getElementById("heatThreshold"),
   noiseThreshold: document.getElementById("noiseThreshold"),
   calendarMetric: document.getElementById("calendarMetric"),
   previewCluster: document.getElementById("calendarLocation"),
   calendarGrid: document.getElementById("calendarGrid"),
+  reportScene: document.getElementById("sceneCanvasReport"),
   trendChart: document.getElementById("trendChart"),
   trendScene: document.getElementById("sceneCanvasTrends"),
   snapshotScene: document.getElementById("sceneCanvasSnapshot"),
@@ -27,6 +33,7 @@ const els = {
 
 const colors = {
   air: "#b8b2ea",
+  pm10: "#f4c269",
   heat: "#f2b9ad",
   noise: "#f3dba5",
   ink: "#181b1f",
@@ -39,8 +46,13 @@ const colors = {
 const metricLabels = {
   composite: "Composite hazard severity",
   air: "PM2.5",
+  pm10: "PM10",
   heat: "Heat Index classification",
   noise: "Noise",
+};
+
+const pictureAssets = {
+  grove: "assets/Grove Hall.avif",
 };
 
 const heatIndexBands = [
@@ -86,6 +98,68 @@ const heatIndexBands = [
   },
 ];
 
+const metricStandards = {
+  composite: {
+    title: "Composite Hazard Severity",
+    note: "Composite colors combine available daily averages across PM2.5, PM10, Heat Index, and Noise.",
+    bands: [
+      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
+      { label: "Lower", detail: "Less than 70% of threshold", min: 0, max: 0.7, color: "#e8f0ea" },
+      { label: "Elevated", detail: "70% to 100% of threshold", min: 0.7, max: 1, color: "#f3dba5" },
+      { label: "Exceeded", detail: "100% to 140% of threshold", min: 1, max: 1.4, color: "#e29974" },
+      { label: "High", detail: "140% of threshold or higher", min: 1.4, max: Infinity, color: "#c45f4e" },
+    ],
+  },
+  air: {
+    title: "PM2.5",
+    note: "PM2.5 colors use daily cluster averages compared with the EPA daily standard.",
+    bands: [
+      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
+      { label: "Below", detail: "Less than 25 ug/m3", min: 0, max: 25, color: "#f4f2ff" },
+      { label: "Near standard", detail: "25 to 35.4 ug/m3", min: 25, max: 35.5, color: "#d9d4f4" },
+      { label: "Above standard", detail: "35.5 to 55.4 ug/m3", min: 35.5, max: 55.5, color: "#b8b2ea" },
+      { label: "High", detail: "55.5 ug/m3 and higher", min: 55.5, max: Infinity, color: "#7e6fd4" },
+    ],
+  },
+  pm10: {
+    title: "PM10",
+    note: "PM10 colors use daily cluster averages compared with the EPA daily standard.",
+    bands: [
+      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
+      { label: "Below", detail: "Less than 100 ug/m3", min: 0, max: 100, color: "#fff7e8" },
+      { label: "Near standard", detail: "100 to 149 ug/m3", min: 100, max: 150, color: "#f9dca1" },
+      { label: "Above standard", detail: "150 to 254 ug/m3", min: 150, max: 255, color: "#f4c269" },
+      { label: "High", detail: "255 ug/m3 and higher", min: 255, max: Infinity, color: "#c9791f" },
+    ],
+  },
+  heat: {
+    title: "Heat Index",
+    note: "Heat Index colors use daily cluster averages and follow the HI thresholds: <80°F, 80-90°F, 90-103°F, 103-124°F, and 125°F+.",
+    bands: heatIndexBands.map((band) => ({
+      label: band.label,
+      detail: band.label === "No HI Classification" ? "Less than 80°F" :
+        band.label === "Caution" ? "80°F - 90°F" :
+          band.label === "Extreme Caution" ? "90°F - 103°F" :
+            band.label === "Danger" ? "103°F - 124°F" : "125°F and higher",
+      min: band.min,
+      max: band.max,
+      color: band.color,
+      className: band.className,
+    })),
+  },
+  noise: {
+    title: "Noise",
+    note: "Noise colors use daily cluster averages and Boston noise limits for overnight and all-time readings.",
+    bands: [
+      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
+      { label: "Below overnight limit", detail: "Less than 50 dB", min: 0, max: 50, color: "#fff8e6" },
+      { label: "Above overnight limit", detail: "50 to 69 dB", min: 50, max: 70, color: "#f3dba5" },
+      { label: "Above all-time limit", detail: "70 to 84 dB", min: 70, max: 85, color: "#d9a94e" },
+      { label: "High", detail: "85 dB and higher", min: 85, max: Infinity, color: "#9f6b16" },
+    ],
+  },
+};
+
 const sampleDailyValues = [
   ["2026-06-01", 18, 82, 61],
   ["2026-06-02", 42, 85, 72],
@@ -129,6 +203,7 @@ const sampleRows = Array.from({ length: 5 }, (_, clusterIndex) => {
       cluster: `Sample Cluster ${clusterNumber}`,
       sensorId: `SC${clusterNumber}-${sensorNumber}`,
       air: roundNumber(air + clusterOffset + sensorNumber + dayWave * 0.8),
+      pm10: roundNumber((air + clusterOffset + sensorNumber + dayWave * 0.8) * 2.25),
       heat: roundNumber(heat + clusterOffset * 1.4 + sensorNumber * 1.5 + dayWave),
       noise: roundNumber(noise + clusterOffset * 1.8 + sensorNumber * 1.2 - dayWave * 0.5),
     }));
@@ -178,6 +253,7 @@ function normalizeRows(csvRows) {
   const clusterIndex = findColumn(["cluster", "admin area", "admin_area", "area", "zone", "neighborhood"]);
   const sensorIndex = findColumn(["sensor_id", "sensor id", "sensor", "device", "station"]);
   const airIndex = findColumn(["pm2.5", "pm25", "air", "particulate"]);
+  const pm10Index = findColumn(["pm10", "pm 10", "pm_10"]);
   const heatIndex = findColumn(["heat_index", "temperature", "temp", "heat"]);
   const noiseIndex = findColumn(["noise", "decibel", "db"]);
 
@@ -186,6 +262,7 @@ function normalizeRows(csvRows) {
     cluster: cleanText(row[clusterIndex]) || "Sample Cluster",
     sensorId: cleanText(row[sensorIndex]),
     air: toNumber(row[airIndex]),
+    pm10: toNumber(row[pm10Index]),
     heat: toNumber(row[heatIndex]),
     noise: toNumber(row[noiseIndex]),
   })).filter((row) => row.date);
@@ -224,6 +301,7 @@ function monthInfo() {
 function thresholds() {
   return {
     air: Number(els.airThreshold.value) || 0,
+    pm10: Number(els.pm10Threshold.value) || 0,
     heat: Number(els.heatThreshold.value) || 0,
     noise: Number(els.noiseThreshold.value) || 0,
   };
@@ -231,6 +309,7 @@ function thresholds() {
 
 function metricUnit(metric) {
   if (metric === "air") return "ug/m3";
+  if (metric === "pm10") return "ug/m3";
   if (metric === "heat") return "°F";
   if (metric === "noise") return "dB";
   return "severity";
@@ -253,6 +332,7 @@ function averageRowsByDate(rows) {
         date: row.date,
         cluster: row.cluster,
         air: { sum: 0, count: 0 },
+        pm10: { sum: 0, count: 0 },
         heat: { sum: 0, count: 0 },
         noise: { sum: 0, count: 0 },
         sensorCount: new Set(),
@@ -261,7 +341,7 @@ function averageRowsByDate(rows) {
 
     const group = grouped.get(row.date);
     if (row.sensorId) group.sensorCount.add(row.sensorId);
-    ["air", "heat", "noise"].forEach((key) => {
+    ["air", "pm10", "heat", "noise"].forEach((key) => {
       if (row[key] === null) return;
       group[key].sum += row[key];
       group[key].count += 1;
@@ -274,9 +354,10 @@ function averageRowsByDate(rows) {
       date: group.date,
       cluster: group.cluster,
       air: averageMetric(group.air),
+      pm10: averageMetric(group.pm10),
       heat: averageMetric(group.heat),
       noise: averageMetric(group.noise),
-      sensorCount: group.sensorCount.size || Math.max(group.air.count, group.heat.count, group.noise.count),
+      sensorCount: group.sensorCount.size || Math.max(group.air.count, group.pm10.count, group.heat.count, group.noise.count),
     }));
 }
 
@@ -291,12 +372,11 @@ function clusterOptions() {
 function updateClusterOptions(preferredCluster = els.location.value) {
   const clusters = clusterOptions();
   populateClusterSelect(els.location, clusters);
-  populateClusterSelect(els.previewCluster, clusters);
 
   const selectedCluster = clusters.includes(preferredCluster) ? preferredCluster : clusters[0];
   if (!selectedCluster) return;
   els.location.value = selectedCluster;
-  els.previewCluster.value = selectedCluster;
+  els.previewCluster.textContent = selectedCluster;
 }
 
 function populateClusterSelect(select, clusters) {
@@ -312,13 +392,14 @@ function populateClusterSelect(select, clusters) {
 function exceedanceStats() {
   const limits = thresholds();
   const rows = filteredRows();
-  const counts = { air: 0, heat: 0, noise: 0 };
-  const max = { air: null, heat: null, noise: null };
+  const counts = { air: 0, pm10: 0, heat: 0, noise: 0 };
+  const max = { air: null, pm10: null, heat: null, noise: null };
   const byDate = new Map();
 
   rows.forEach((row) => {
     const flags = {
       air: row.air !== null && row.air >= limits.air,
+      pm10: row.pm10 !== null && row.pm10 >= limits.pm10,
       heat: row.heat !== null && row.heat >= limits.heat,
       noise: row.noise !== null && row.noise >= limits.noise,
     };
@@ -351,14 +432,14 @@ function rowSeverity(row, metric, limits) {
 
   if (metric !== "composite") {
     const value = row[metric];
-    if (value === null) return null;
+    if (value === null || value === undefined) return null;
     const limit = limits[metric] || 1;
     return Math.max(0, Math.min(1.6, value / limit));
   }
 
-  const severities = ["air", "heat", "noise"]
+  const severities = ["air", "pm10", "heat", "noise"]
     .map((key) => {
-      if (row[key] === null) return null;
+      if (row[key] === null || row[key] === undefined) return null;
       return Math.max(0, row[key] / (limits[key] || 1));
     })
     .filter((value) => value !== null);
@@ -399,21 +480,63 @@ function heatIndexBand(value) {
   return heatIndexBands.find((band) => value >= band.min && value < band.max) || heatIndexBands[heatIndexBands.length - 1];
 }
 
+function standardBand(metric, row, severity) {
+  if (!row) return metricStandards[metric]?.bands[0] || metricStandards.composite.bands[0];
+  if (metric === "composite") {
+    return metricStandards.composite.bands.find((band) => {
+      if (band.min === null) return severity === null;
+      return severity !== null && severity >= band.min && severity < band.max;
+    }) || metricStandards.composite.bands[metricStandards.composite.bands.length - 1];
+  }
+  if (metric === "heat") return heatIndexBand(row.heat) || metricStandards.heat.bands[0];
+  const value = row[metric];
+  const bands = metricStandards[metric]?.bands || metricStandards.composite.bands;
+  return bands.find((band) => {
+    if (band.min === null) return value === null || value === undefined;
+    return value !== null && value !== undefined && value >= band.min && value < band.max;
+  }) || bands[bands.length - 1];
+}
+
 function calendarColor(row, metric, severity) {
-  if (!row) return "#ffffff";
-  if (metric === "heat") return heatIndexBand(row.heat)?.color || "#ffffff";
-  return heatColor(severity);
+  return standardBand(metric, row, severity)?.color || "#ffffff";
 }
 
 function calendarLabel(row, metric, severity) {
   if (!row) return "No data";
-  if (metric === "heat") return heatIndexBand(row.heat)?.label || "No data";
-  return heatLabel(severity);
+  return standardBand(metric, row, severity)?.label || "No data";
 }
 
 function calendarBandClass(row, metric) {
-  if (!row || metric !== "heat") return "";
-  return heatIndexBand(row.heat)?.className || "";
+  if (!row) return "";
+  return standardBand(metric, row, rowSeverity(row, metric, thresholds()))?.className || "";
+}
+
+function renderStandards(metric) {
+  const standard = metricStandards[metric] || metricStandards.composite;
+  const title = document.getElementById("standardsTitle");
+  const graphic = document.getElementById("standardsGraphic");
+  title.textContent = standard.title;
+  graphic.innerHTML = "";
+  graphic.className = `hi-legend standard-legend standard-legend-${metric}`;
+  graphic.setAttribute("aria-label", `${standard.title} standards color scale`);
+
+  standard.bands.forEach((band) => {
+    const item = document.createElement("span");
+    item.className = band.className || "";
+    item.style.background = band.color;
+    item.style.color = darkTextOn(band.color) ? "#11151a" : "#ffffff";
+    item.innerHTML = `${band.label}<small>${band.detail}</small>`;
+    graphic.append(item);
+  });
+}
+
+function darkTextOn(color) {
+  const hex = color.replace("#", "");
+  if (hex.length !== 6) return true;
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 145;
 }
 
 function renderCalendar() {
@@ -423,9 +546,8 @@ function renderCalendar() {
   const metric = els.calendarMetric.value;
   const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
   els.calendarGrid.innerHTML = "";
-  document.getElementById("heatmapNote").textContent = metric === "heat"
-    ? "Heat Index colors use daily cluster averages and follow the HI thresholds: <80°F, 80-90°F, 90-103°F, 103-124°F, and 125°F+."
-    : `${metricLabels[metric]} heatmap from daily cluster averages. Darker cells show higher values relative to the selected thresholds.`;
+  renderStandards(metric);
+  document.getElementById("heatmapNote").textContent = (metricStandards[metric] || metricStandards.composite).note;
 
   weekdays.forEach((day) => {
     const item = document.createElement("div");
@@ -453,13 +575,14 @@ function renderCalendar() {
       <span class="heatmap-value">${formatCellValue(datum, metric, severity)}</span>
       <div class="hazard-dots" aria-label="Exceeded thresholds">
         <span class="air ${datum?.flags.air ? "active" : ""}" title="PM2.5 threshold"></span>
+        <span class="pm10 ${datum?.flags.pm10 ? "active" : ""}" title="PM10 threshold"></span>
         <span class="heat ${datum?.flags.heat ? "active" : ""}" title="Heat threshold"></span>
         <span class="noise ${datum?.flags.noise ? "active" : ""}" title="Noise threshold"></span>
       </div>
     `;
     cell.setAttribute("aria-label", `${date}: ${label}`);
     const summary = datum
-      ? `Averaged from ${datum.sensorCount || 0} sensor row(s). PM2.5 ${datum.air ?? "n/a"}, Heat ${datum.heat ?? "n/a"}, Noise ${datum.noise ?? "n/a"}`
+      ? `Averaged from ${datum.sensorCount || 0} sensor row(s). PM2.5 ${datum.air ?? "n/a"}, PM10 ${datum.pm10 ?? "n/a"}, Heat ${datum.heat ?? "n/a"}, Noise ${datum.noise ?? "n/a"}`
       : "No data";
     cell.title = `${date}: ${label}. ${summary}`;
     els.calendarGrid.append(cell);
@@ -469,7 +592,7 @@ function renderCalendar() {
 function formatCellValue(row, metric, severity) {
   if (!row) return "";
   if (metric === "composite") return severity === null ? "" : `${Math.round(severity * 100)}%`;
-  return row[metric] === null ? "" : `${row[metric]}`;
+  return row[metric] === null || row[metric] === undefined ? "" : `${row[metric]}`;
 }
 
 function renderTrendChart() {
@@ -552,6 +675,15 @@ function renderScene(canvas) {
     return;
   }
 
+  const builtInImage = state.builtInImages[state.imageChoice];
+  if (builtInImage?.complete && builtInImage.naturalWidth) {
+    const scale = Math.max(width / builtInImage.width, height / builtInImage.height);
+    const drawW = builtInImage.width * scale;
+    const drawH = builtInImage.height * scale;
+    ctx.drawImage(builtInImage, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
+    return;
+  }
+
   const gradient = ctx.createLinearGradient(0, 0, width, height);
   if (state.imageChoice === "school") {
     gradient.addColorStop(0, "#8fb7a1");
@@ -595,8 +727,24 @@ function renderScene(canvas) {
   ctx.fillText(label, width * 0.06, height * 0.88);
 }
 
+function preloadPictureAssets() {
+  Object.entries(pictureAssets).forEach(([key, src]) => {
+    const image = new Image();
+    image.onload = render;
+    image.src = src;
+    state.builtInImages[key] = image;
+  });
+}
+
 function plural(count, noun) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function formatReportDate(value) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" });
 }
 
 function updateText() {
@@ -604,13 +752,19 @@ function updateText() {
   const stats = exceedanceStats();
   const title = els.title.value.trim() || "Composite Calendar";
   const location = els.location.value || "Sensor Site";
+  const catchphrase = els.catchphrase.value.trim() || `What's going on in ${location}?`;
+  const author = els.author.value.trim() || "Name";
+  const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
   document.querySelectorAll('[data-bind="title"]').forEach((node) => { node.textContent = title; });
   document.querySelectorAll('[data-bind="monthShort"]').forEach((node) => { node.textContent = info.short; });
+  document.getElementById("reportCatchphrasePreview").textContent = catchphrase;
+  document.getElementById("reportPhotoTitle").textContent = location;
+  document.getElementById("reportMeta").textContent = `Prepared by ${author} on ${reportDate}`;
   document.getElementById("calendarMonth").textContent = info.long;
-  if (els.previewCluster.value !== location) els.previewCluster.value = location;
+  els.previewCluster.textContent = location;
   const userNote = els.generalInfo.value.trim();
   if (document.activeElement !== els.notePreview) {
-    els.notePreview.value = userNote || "Type in your comments/stories/lived experience here";
+    els.notePreview.textContent = userNote || "Type in your comments/stories/lived experience here";
   }
   els.notePreview.classList.toggle("empty-note", !userNote);
   document.getElementById("trendSubhead").textContent = `${location} in ${info.long}`;
@@ -642,6 +796,7 @@ function updateText() {
 function render() {
   updateText();
   renderCalendar();
+  renderScene(els.reportScene);
   renderTrendChart();
   renderScene(els.trendScene);
   renderScene(els.snapshotScene);
@@ -664,18 +819,13 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 });
 
 ["input", "change"].forEach((eventName) => {
-  [els.title, els.location, els.month, els.generalInfo, els.airThreshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
+  [els.title, els.author, els.reportDate, els.catchphrase, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
     input.addEventListener(eventName, render);
   });
 });
 
-els.previewCluster.addEventListener("change", () => {
-  els.location.value = els.previewCluster.value;
-  render();
-});
-
 els.notePreview.addEventListener("input", () => {
-  els.generalInfo.value = els.notePreview.value;
+  els.generalInfo.value = els.notePreview.textContent;
   render();
 });
 
@@ -714,7 +864,7 @@ els.csvUpload.addEventListener("change", () => {
   reader.readAsText(file);
 });
 
-document.getElementById("loadSampleBtn").addEventListener("click", () => {
+document.getElementById("loadSampleBtn")?.addEventListener("click", () => {
   state.rows = sampleRows;
   els.month.value = "2026-06";
   updateClusterOptions("Sample Cluster 1");
@@ -724,5 +874,6 @@ document.getElementById("loadSampleBtn").addEventListener("click", () => {
 document.getElementById("printBtn").addEventListener("click", () => window.print());
 
 state.rows = sampleRows;
+preloadPictureAssets();
 updateClusterOptions("Sample Cluster 1");
 render();

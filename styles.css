@@ -281,22 +281,32 @@ textarea {
 
 .report-hero-block {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 36%);
-  gap: 28px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) minmax(240px, 34%);
+  gap: 24px;
+  align-items: center;
   margin: 0 0 26px;
   padding-bottom: 22px;
   border-bottom: 2px solid #c8d0d3;
 }
 
+.report-catchphrase-column,
 .report-photo-title {
   align-self: center;
+  min-width: 0;
+}
+
+.report-catchphrase-column h3 {
+  margin-top: 8px;
+  font-size: clamp(1.45rem, 3vw, 2.45rem);
+  line-height: 1.02;
+  overflow-wrap: anywhere;
 }
 
 .report-photo-title h3 {
   margin-top: 8px;
-  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-size: clamp(1.8rem, 3.4vw, 3.1rem);
   line-height: 1;
+  overflow-wrap: anywhere;
 }
 
 .report-image-panel {
@@ -464,7 +474,7 @@ textarea {
 .hi-legend small {
   display: block;
   margin-top: 6px;
-  color: #11151a;
+  color: inherit;
   font-size: clamp(0.54rem, 0.9vw, 0.66rem);
   font-weight: 800;
 }
@@ -1000,14 +1010,18 @@ th {
   }
 
   .report-hero-block {
-    grid-template-columns: minmax(0, 1fr) 2.25in;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) 2.25in;
     gap: 0.18in;
     margin-bottom: 0.12in;
     padding-bottom: 0.1in;
   }
 
+  .report-catchphrase-column h3 {
+    font-size: 17pt;
+  }
+
   .report-photo-title h3 {
-    font-size: 26pt;
+    font-size: 20pt;
   }
 
   .report-meta {
