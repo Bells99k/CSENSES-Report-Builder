@@ -648,18 +648,19 @@ function renderCalendar() {
     const datum = stats.byDate.get(date);
     const severity = rowSeverity(datum, metric, limits);
     const label = calendarLabel(datum, metric, severity);
+    const cellColor = calendarColor(datum, metric, severity);
     const cell = document.createElement("div");
-    cell.className = `day heatmap-day ${calendarBandClass(datum, metric)} ${severity !== null && severity >= 1 ? "is-over-threshold" : ""}`;
-    cell.style.setProperty("--heat", calendarColor(datum, metric, severity));
+    cell.className = [
+      "day",
+      "heatmap-day",
+      calendarBandClass(datum, metric),
+      severity !== null && severity >= 1 ? "is-over-threshold" : "",
+      !darkTextOn(cellColor) ? "is-dark-cell" : "",
+    ].filter(Boolean).join(" ");
+    cell.style.setProperty("--heat", cellColor);
     cell.innerHTML = `
       <span class="day-number">${day}</span>
       <span class="heatmap-value">${formatCellValue(datum, metric, severity)}</span>
-      <div class="hazard-dots" aria-label="Exceeded thresholds">
-        <span class="air ${datum?.flags.air ? "active" : ""}" title="PM2.5 threshold"></span>
-        <span class="pm10 ${datum?.flags.pm10 ? "active" : ""}" title="PM10 threshold"></span>
-        <span class="heat ${datum?.flags.heat ? "active" : ""}" title="Heat threshold"></span>
-        <span class="noise ${datum?.flags.noise ? "active" : ""}" title="Noise threshold"></span>
-      </div>
     `;
     cell.setAttribute("aria-label", `${date}: ${label}`);
     const summary = datum

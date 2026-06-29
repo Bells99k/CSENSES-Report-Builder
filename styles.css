@@ -629,41 +629,6 @@ textarea {
   color: white;
 }
 
-.hazard-dots {
-  display: flex;
-  justify-content: end;
-  gap: 4px;
-}
-
-.hazard-dots span {
-  width: 7px;
-  height: 7px;
-  border: 1px solid rgba(24, 27, 31, 0.35);
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.hazard-dots .active {
-  border-color: rgba(24, 27, 31, 0.65);
-  opacity: 1;
-}
-
-.hazard-dots .air.active {
-  background: var(--air);
-}
-
-.hazard-dots .pm10.active {
-  background: var(--pm10, #f4c269);
-}
-
-.hazard-dots .heat.active {
-  background: var(--heat);
-}
-
-.hazard-dots .noise.active {
-  background: var(--noise);
-}
-
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1320,11 +1285,6 @@ th {
 
   .heatmap-value {
     font-size: 7.5pt;
-  }
-
-  .hazard-dots span {
-    width: 5px;
-    height: 5px;
   }
 
   .summary-grid {
