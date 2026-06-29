@@ -25,7 +25,7 @@
         <div hidden>
           <input id="reportTitle" type="hidden" value="Composite Calendar">
           <input id="airThreshold" type="hidden" value="35.5">
-          <input id="pm10Threshold" type="hidden" value="150">
+          <input id="pm10Threshold" type="hidden" value="155">
           <input id="heatThreshold" type="hidden" value="80">
           <input id="noiseThreshold" type="hidden" value="70">
           <textarea id="generalInfo">Type in your comments/stories/lived experience here</textarea>
@@ -33,6 +33,10 @@
 
         <section>
           <h2>Data Observer Information</h2>
+          <div class="segmented" role="tablist" aria-label="Choose report template">
+            <button class="template-tab is-active" type="button" data-template="composite" role="tab" aria-selected="true">Template 1</button>
+            <button class="template-tab" type="button" data-template="trends" role="tab" aria-selected="false">Template 2</button>
+          </div>
           <label>
             Your name
             <input id="reportAuthor" type="text" placeholder="Enter your name">
@@ -72,6 +76,10 @@
               <option value="Sample Cluster 5">Sample Cluster 5</option>
             </select>
           </label>
+          <div class="field-group" data-template-control="trends" hidden>
+            <p class="field-label">Comparison locations</p>
+            <div id="comparisonLocations" class="check-list" aria-label="Comparison locations"></div>
+          </div>
         </section>
 
         <section>
@@ -209,33 +217,53 @@
           </section>
 
           <section class="template template-trends" data-template-panel="trends">
-            <header class="report-header compact">
-              <p class="template-label">Template 2</p>
-              <h2>Sensor Trend Brief</h2>
-              <p id="trendSubhead">Sample Cluster 1 in June 2026</p>
+            <header class="report-header">
+              <div class="report-masthead">
+                <img class="report-logo" src="assets/common-senses-logo.png" alt="Common Senses logo">
+                <p class="report-kicker">COMMON SENSES DATA OBSERVER REPORT</p>
+                <p class="template-label">Template 2</p>
+              </div>
             </header>
-            <div class="media-band">
-              <canvas id="sceneCanvasTrends" width="960" height="320" aria-label="Selected report image"></canvas>
+
+            <div class="report-hero-block">
+              <div class="report-catchphrase-column">
+                <p class="eyebrow">Catchphrase</p>
+                <h3 id="trendCatchphrasePreview">What's going on in Grove Hall?</h3>
+              </div>
+              <div class="report-photo-title">
+                <p class="eyebrow">Comparison Area</p>
+                <h3 id="trendPhotoTitle">Grove Hall</h3>
+                <p class="report-meta" id="trendMeta">Prepared by Name on June 24, 2026</p>
+              </div>
+              <div class="report-image-panel" aria-label="Selected report picture">
+                <canvas id="sceneCanvasTrends" width="640" height="420"></canvas>
+              </div>
             </div>
-            <div class="panel chart-panel">
-              <div class="calendar-heading">
-                <div>
-                  <h3>Daily Sensor Readings</h3>
-                  <p>Daily cluster averages from uploaded CSV or sample data.</p>
+
+            <div class="panel large chart-panel comparison-panel">
+              <div class="calendar-heading comparison-heading">
+                <div class="calendar-title-block">
+                  <h3 id="trendMonth">June 2026</h3>
+                  <p id="trendLocationList" class="cluster-preview-text">Sample Cluster 1, Sample Cluster 2, Sample Cluster 3</p>
                 </div>
-                <div class="legend">
-                  <span><i class="air"></i>PM₂.₅</span>
-                  <span><i class="heat"></i>Heat</span>
-                  <span><i class="noise"></i>Noise</span>
+                <div class="standards-wrap">
+                  <p class="standards-title" id="comparisonMetricTitle">Heat Index by Location</p>
+                  <div class="legend comparison-legend" id="comparisonLegend" aria-label="Compared locations"></div>
                 </div>
               </div>
-              <canvas id="trendChart" width="980" height="360" aria-label="Daily sensor line chart"></canvas>
+              <canvas id="trendChart" width="980" height="430" aria-label="Daily location comparison line chart"></canvas>
+              <div id="trendTooltip" class="chart-tooltip" hidden></div>
             </div>
-            <div class="summary-grid metric-row">
-              <article class="panel summary-card"><p>Highest PM₂.₅</p><strong id="maxAir">--</strong></article>
-              <article class="panel summary-card"><p>Highest Heat</p><strong id="maxHeat">--</strong></article>
-              <article class="panel summary-card"><p>Highest Noise</p><strong id="maxNoise">--</strong></article>
+
+            <div class="summary-grid heat-summary-grid metric-row">
+              <article class="panel summary-card"><p id="comparisonPeakLabel">Highest daily average</p><strong id="comparisonPeakLocation">--</strong></article>
+              <article class="panel summary-card"><p id="comparisonAverageLabel">Highest monthly average</p><strong id="comparisonAverageLocation">--</strong></article>
+              <article class="panel summary-card"><p>Locations and days compared</p><strong id="comparisonCoverage">--</strong></article>
             </div>
+
+            <article class="panel info-panel report-note-panel">
+              <div id="trendNotePreview" class="report-note-input" contenteditable="true" role="textbox" aria-label="Template 2 user note">Type in your comments/stories/lived experience here</div>
+            </article>
           </section>
 
           <section class="template template-snapshot" data-template-panel="snapshot">

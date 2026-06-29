@@ -19,6 +19,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body,
 * {
@@ -150,6 +154,47 @@ label {
   font-weight: 700;
 }
 
+.field-group {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.field-label {
+  color: #343a40;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.check-list {
+  display: grid;
+  gap: 6px;
+  max-height: 170px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #aeb8bd;
+  border-radius: 6px;
+  background: #fbfcfc;
+}
+
+.check-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.check-item input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+}
+
 input,
 select,
 textarea {
@@ -167,7 +212,7 @@ textarea {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   border: 1px solid var(--line);
   border-radius: 7px;
   overflow: hidden;
@@ -291,7 +336,7 @@ textarea {
 
 .report-catchphrase-column,
 .report-photo-title {
-  align-self: center;
+  align-self: start;
   min-width: 0;
 }
 
@@ -443,13 +488,17 @@ textarea {
 
 .hi-legend {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--legend-columns, 5), minmax(0, 1fr));
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
-  border: 2px solid #c13025;
+  border: 0;
   border-radius: 18px;
+}
+
+.standard-legend-heat {
+  border: 2px solid #c13025;
 }
 
 .hi-legend span {
@@ -458,13 +507,17 @@ textarea {
   min-width: 0;
   min-height: 58px;
   padding: 7px 6px;
-  border-right: 2px solid #c13025;
+  border-right: 1px solid rgba(255, 255, 255, 0.58);
   text-align: center;
   color: #11151a;
-  font-size: clamp(0.68rem, 1.15vw, 0.84rem);
+  font-size: clamp(0.58rem, 1vw, 0.78rem);
   font-weight: 900;
   line-height: 1.15;
   overflow-wrap: anywhere;
+}
+
+.standard-legend-heat span {
+  border-right: 2px solid #c13025;
 }
 
 .hi-legend span:last-child {
@@ -759,9 +812,77 @@ textarea {
   margin-top: 0;
 }
 
+.comparison-panel {
+  position: relative;
+  min-height: 560px;
+}
+
+.comparison-heading {
+  grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.15fr);
+}
+
+.comparison-legend {
+  justify-content: start;
+}
+
+.comparison-legend span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 #trendChart {
   width: 100%;
   height: auto;
+  cursor: crosshair;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 7px;
+  min-width: 220px;
+  max-width: min(320px, calc(100% - 16px));
+  padding: 12px;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 28px rgba(24, 27, 31, 0.18);
+  color: var(--ink);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+
+.chart-tooltip strong {
+  font-size: 0.95rem;
+}
+
+.chart-tooltip > span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.tooltip-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip-row i {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(24, 27, 31, 0.38);
+  border-radius: 50%;
+}
+
+.tooltip-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tooltip-row b {
+  white-space: nowrap;
 }
 
 .metric-row {
@@ -885,6 +1006,10 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .comparison-heading {
+    grid-template-columns: 1fr;
+  }
+
 }
 
 @media (max-width: 620px) {
@@ -918,6 +1043,19 @@ th {
     justify-content: start;
   }
 
+  .segmented {
+    grid-template-columns: 1fr;
+  }
+
+  .segmented button {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .segmented button:last-child {
+    border-bottom: 0;
+  }
+
   .hi-legend {
     grid-template-columns: 1fr;
     border-radius: 12px;
@@ -926,6 +1064,10 @@ th {
   .hi-legend span {
     min-height: 46px;
     border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.58);
+  }
+
+  .standard-legend-heat span {
     border-bottom: 2px solid #c13025;
   }
 
@@ -1045,9 +1187,17 @@ th {
     padding: 0.1in;
   }
 
+  .chart-panel {
+    padding: 0.1in;
+  }
+
   .calendar-heading {
     gap: 0.08in;
     margin-bottom: 0.08in;
+  }
+
+  .comparison-panel {
+    min-height: 0;
   }
 
   .calendar-heading h3 {
@@ -1059,8 +1209,11 @@ th {
   }
 
   .hi-legend {
-    border-width: 1.25pt;
     border-radius: 9px;
+  }
+
+  .standard-legend-heat {
+    border-width: 1.25pt;
   }
 
   .standards-wrap {
@@ -1114,6 +1267,10 @@ th {
     font-size: 7.5pt;
   }
 
+  #trendChart {
+    height: 2.9in;
+  }
+
   .calendar-grid {
     gap: 3px;
   }
@@ -1151,6 +1308,10 @@ th {
 
   .hi-extreme-danger-cell {
     background: #b03227 !important;
+  }
+
+  .chart-tooltip {
+    display: none !important;
   }
 
   .day-number {

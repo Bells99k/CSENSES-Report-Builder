@@ -4,6 +4,8 @@ const state = {
   imageChoice: "grove",
   uploadedImage: null,
   builtInImages: {},
+  comparisonLocations: [],
+  trendHoverDay: null,
 };
 
 const els = {
@@ -23,10 +25,13 @@ const els = {
   heatThreshold: document.getElementById("heatThreshold"),
   noiseThreshold: document.getElementById("noiseThreshold"),
   calendarMetric: document.getElementById("calendarMetric"),
+  comparisonLocations: document.getElementById("comparisonLocations"),
+  comparisonLegend: document.getElementById("comparisonLegend"),
   previewCluster: document.getElementById("calendarLocation"),
   calendarGrid: document.getElementById("calendarGrid"),
   reportScene: document.getElementById("sceneCanvasReport"),
   trendChart: document.getElementById("trendChart"),
+  trendTooltip: document.getElementById("trendTooltip"),
   trendScene: document.getElementById("sceneCanvasTrends"),
   snapshotScene: document.getElementById("sceneCanvasSnapshot"),
 };
@@ -42,6 +47,9 @@ const colors = {
   leaf: "#6f8b3d",
   coral: "#c45f4e",
 };
+
+const comparisonColors = ["#111827", "#0057ff", "#7b2cbf", "#00838f", "#d0006f", "#4a4e00", "#6d3900", "#334155"];
+const trendChartPadding = { left: 64, right: 28, top: 30, bottom: 56 };
 
 const metricLabels = {
   composite: "Composite hazard severity",
@@ -102,8 +110,8 @@ const metricStandards = {
   composite: {
     title: "Composite Hazard Severity",
     note: "Composite colors combine available daily averages across PM2.5, PM10, Heat Index, and Noise.",
+    noDataColor: "#ffffff",
     bands: [
-      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
       { label: "Lower", detail: "Less than 70% of threshold", min: 0, max: 0.7, color: "#e8f0ea" },
       { label: "Elevated", detail: "70% to 100% of threshold", min: 0.7, max: 1, color: "#f3dba5" },
       { label: "Exceeded", detail: "100% to 140% of threshold", min: 1, max: 1.4, color: "#e29974" },
@@ -112,24 +120,28 @@ const metricStandards = {
   },
   air: {
     title: "PM2.5",
-    note: "PM2.5 colors use daily cluster averages compared with the EPA daily standard.",
+    note: "PM2.5 colors follow U.S. EPA Air Quality Index categories for daily average PM2.5 concentrations.",
+    noDataColor: "#ffffff",
     bands: [
-      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
-      { label: "Below", detail: "Less than 25 ug/m3", min: 0, max: 25, color: "#f4f2ff" },
-      { label: "Near standard", detail: "25 to 35.4 ug/m3", min: 25, max: 35.5, color: "#d9d4f4" },
-      { label: "Above standard", detail: "35.5 to 55.4 ug/m3", min: 35.5, max: 55.5, color: "#b8b2ea" },
-      { label: "High", detail: "55.5 ug/m3 and higher", min: 55.5, max: Infinity, color: "#7e6fd4" },
+      { label: "Good", detail: "0-9", min: 0, max: 9.1, color: "#008334" },
+      { label: "Moderate", detail: "9.1-35.4", min: 9.1, max: 35.5, color: "#ffa331" },
+      { label: "Unhealthy for Sensitive Groups", detail: "35.5-55.4", min: 35.5, max: 55.5, color: "#ff6523" },
+      { label: "Unhealthy", detail: "55.5-125.4", min: 55.5, max: 125.5, color: "#ee1e1e" },
+      { label: "Very Unhealthy", detail: "125.5-225.4", min: 125.5, max: 225.5, color: "#612e61" },
+      { label: "Hazardous", detail: ">=225.5", min: 225.5, max: Infinity, color: "#660e10" },
     ],
   },
   pm10: {
     title: "PM10",
-    note: "PM10 colors use daily cluster averages compared with the EPA daily standard.",
+    note: "PM10 colors follow U.S. EPA Air Quality Index categories for daily average PM10 concentrations.",
+    noDataColor: "#ffffff",
     bands: [
-      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
-      { label: "Below", detail: "Less than 100 ug/m3", min: 0, max: 100, color: "#fff7e8" },
-      { label: "Near standard", detail: "100 to 149 ug/m3", min: 100, max: 150, color: "#f9dca1" },
-      { label: "Above standard", detail: "150 to 254 ug/m3", min: 150, max: 255, color: "#f4c269" },
-      { label: "High", detail: "255 ug/m3 and higher", min: 255, max: Infinity, color: "#c9791f" },
+      { label: "Good", detail: "0-54", min: 0, max: 55, color: "#008636" },
+      { label: "Moderate", detail: "55-154", min: 55, max: 155, color: "#ffa52f" },
+      { label: "Unhealthy for Sensitive Groups", detail: "155-254", min: 155, max: 255, color: "#ff6221" },
+      { label: "Unhealthy", detail: "255-354", min: 255, max: 355, color: "#e41f21" },
+      { label: "Very Unhealthy", detail: "355-424", min: 355, max: 425, color: "#62346c" },
+      { label: "Hazardous", detail: ">=425", min: 425, max: Infinity, color: "#691011" },
     ],
   },
   heat: {
@@ -149,13 +161,12 @@ const metricStandards = {
   },
   noise: {
     title: "Noise",
-    note: "Noise colors use daily cluster averages and Boston noise limits for overnight and all-time readings.",
+    note: "Noise colors follow the City of Boston Noise Regulation: acceptable at any time below 50 dB, daytime-only from 50 to 70 dB, and unreasonable at any time at 70 dB and higher.",
+    noDataColor: "#ffffff",
     bands: [
-      { label: "No data", detail: "Missing readings", min: null, max: null, color: "#ffffff" },
-      { label: "Below overnight limit", detail: "Less than 50 dB", min: 0, max: 50, color: "#fff8e6" },
-      { label: "Above overnight limit", detail: "50 to 69 dB", min: 50, max: 70, color: "#f3dba5" },
-      { label: "Above all-time limit", detail: "70 to 84 dB", min: 70, max: 85, color: "#d9a94e" },
-      { label: "High", detail: "85 dB and higher", min: 85, max: Infinity, color: "#9f6b16" },
+      { label: "Acceptable at Any Time", detail: "0-50 dB", min: 0, max: 50, color: "#00944d" },
+      { label: "Acceptable Only from 7 a.m. to 11 p.m.", detail: "50-70 dB", min: 50, max: 70, color: "#f9b934" },
+      { label: "Unreasonable at Any Time", detail: ">=70 dB", min: 70, max: Infinity, color: "#810c10" },
     ],
   },
 };
@@ -315,12 +326,27 @@ function metricUnit(metric) {
   return "severity";
 }
 
+function metricDisplay(metric) {
+  return {
+    air: "PM2.5",
+    pm10: "PM10",
+    heat: "Heat Index",
+    noise: "Noise",
+  }[metric] || "Sensor reading";
+}
+
 function filteredRows() {
   const { year, month } = monthInfo();
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   const cluster = els.location.value;
   const rows = state.rows.filter((row) => row.date.startsWith(prefix) && row.cluster === cluster);
   return averageRowsByDate(rows);
+}
+
+function monthRowsForCluster(cluster) {
+  const { year, month } = monthInfo();
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  return averageRowsByDate(state.rows.filter((row) => row.date.startsWith(prefix) && row.cluster === cluster));
 }
 
 function averageRowsByDate(rows) {
@@ -377,6 +403,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   if (!selectedCluster) return;
   els.location.value = selectedCluster;
   els.previewCluster.textContent = selectedCluster;
+  updateComparisonLocationOptions(clusters, selectedCluster);
 }
 
 function populateClusterSelect(select, clusters) {
@@ -386,6 +413,58 @@ function populateClusterSelect(select, clusters) {
     option.value = cluster;
     option.textContent = cluster;
     select.append(option);
+  });
+}
+
+function updateComparisonLocationOptions(clusters, primaryCluster = els.location.value) {
+  const previous = state.comparisonLocations.filter((cluster) => clusters.includes(cluster));
+  const defaults = [primaryCluster, ...clusters].filter((cluster, index, all) => cluster && all.indexOf(cluster) === index).slice(0, Math.min(4, clusters.length));
+  state.comparisonLocations = previous.length ? previous : defaults;
+  renderComparisonLocationOptions(clusters);
+}
+
+function renderComparisonLocationOptions(clusters = clusterOptions()) {
+  els.comparisonLocations.innerHTML = "";
+  clusters.forEach((cluster) => {
+    const label = document.createElement("label");
+    label.className = "check-item";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = cluster;
+    input.checked = state.comparisonLocations.includes(cluster);
+    input.addEventListener("change", () => {
+      const selected = Array.from(els.comparisonLocations.querySelectorAll("input:checked")).map((item) => item.value);
+      state.comparisonLocations = selected.length ? selected : [cluster];
+      if (!selected.length) input.checked = true;
+      render();
+    });
+    label.append(input, document.createTextNode(cluster));
+    els.comparisonLocations.append(label);
+  });
+}
+
+function selectedComparisonLocations() {
+  const clusters = clusterOptions();
+  const selected = state.comparisonLocations.filter((cluster) => clusters.includes(cluster));
+  if (selected.length) return selected;
+  return clusters.slice(0, Math.min(4, clusters.length));
+}
+
+function comparisonSeries() {
+  const metric = els.calendarMetric.value;
+  return selectedComparisonLocations().map((cluster, index) => {
+    const rows = monthRowsForCluster(cluster);
+    const values = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
+    const peak = values.length ? Math.max(...values.map((row) => row[metric])) : null;
+    const average = values.length ? roundNumber(values.reduce((sum, row) => sum + row[metric], 0) / values.length) : null;
+    return {
+      cluster,
+      rows,
+      values,
+      peak,
+      average,
+      color: comparisonColors[index % comparisonColors.length],
+    };
   });
 }
 
@@ -481,19 +560,20 @@ function heatIndexBand(value) {
 }
 
 function standardBand(metric, row, severity) {
-  if (!row) return metricStandards[metric]?.bands[0] || metricStandards.composite.bands[0];
+  const standard = metricStandards[metric] || metricStandards.composite;
+  const noDataBand = { label: "No data", detail: "Missing readings", color: standard.noDataColor || "#ffffff" };
+  if (!row) return noDataBand;
   if (metric === "composite") {
     return metricStandards.composite.bands.find((band) => {
-      if (band.min === null) return severity === null;
       return severity !== null && severity >= band.min && severity < band.max;
-    }) || metricStandards.composite.bands[metricStandards.composite.bands.length - 1];
+    }) || noDataBand;
   }
-  if (metric === "heat") return heatIndexBand(row.heat) || metricStandards.heat.bands[0];
+  if (metric === "heat") return heatIndexBand(row.heat) || noDataBand;
   const value = row[metric];
-  const bands = metricStandards[metric]?.bands || metricStandards.composite.bands;
+  if (value === null || value === undefined) return noDataBand;
+  const bands = standard.bands;
   return bands.find((band) => {
-    if (band.min === null) return value === null || value === undefined;
-    return value !== null && value !== undefined && value >= band.min && value < band.max;
+    return value >= band.min && value < band.max;
   }) || bands[bands.length - 1];
 }
 
@@ -518,6 +598,7 @@ function renderStandards(metric) {
   title.textContent = standard.title;
   graphic.innerHTML = "";
   graphic.className = `hi-legend standard-legend standard-legend-${metric}`;
+  graphic.style.setProperty("--legend-columns", standard.bands.length);
   graphic.setAttribute("aria-label", `${standard.title} standards color scale`);
 
   standard.bands.forEach((band) => {
@@ -595,69 +676,264 @@ function formatCellValue(row, metric, severity) {
   return row[metric] === null || row[metric] === undefined ? "" : `${row[metric]}`;
 }
 
+function standardChartCeiling(metric, valueMax) {
+  const standard = metricStandards[metric];
+  if (!standard) return valueMax;
+  const finiteBandTops = standard.bands
+    .map((band) => band.max)
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b);
+  return finiteBandTops.find((value) => value >= valueMax) || finiteBandTops[finiteBandTops.length - 1] || valueMax;
+}
+
+function drawStandardBands(ctx, metric, padding, plotW, plotH, chartMax) {
+  const standard = metricStandards[metric];
+  if (!standard) return;
+
+  const valueToY = (value) => padding.top + plotH - (value / chartMax) * plotH;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(padding.left, padding.top, plotW, plotH);
+  ctx.clip();
+
+  standard.bands.forEach((band) => {
+    const min = Number.isFinite(band.min) ? Math.max(0, band.min) : 0;
+    const max = Number.isFinite(band.max) ? Math.min(chartMax, band.max) : chartMax;
+    if (max <= 0 || min >= chartMax || max <= min) return;
+
+    const yTop = valueToY(max);
+    const yBottom = valueToY(min);
+    ctx.fillStyle = band.color;
+    ctx.fillRect(padding.left, yTop, plotW, yBottom - yTop);
+  });
+
+  ctx.restore();
+}
+
+function trendChartGeometry(canvas = els.trendChart) {
+  const padding = trendChartPadding;
+  return {
+    padding,
+    plotW: canvas.width - padding.left - padding.right,
+    plotH: canvas.height - padding.top - padding.bottom,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
+}
+
+function formatMetricTooltipValue(value, metric) {
+  if (value === null || value === undefined) return "No data";
+  return `${value} ${metricUnit(metric)}`;
+}
+
+function comparisonValuesForDay(day) {
+  const metric = els.calendarMetric.value;
+  return comparisonSeries().map((item) => {
+    const row = item.rows.find((datum) => Number(datum.date.slice(-2)) === day);
+    return {
+      cluster: item.cluster,
+      color: item.color,
+      value: row?.[metric],
+    };
+  });
+}
+
 function renderTrendChart() {
   const canvas = els.trendChart;
   const ctx = canvas.getContext("2d");
   const width = canvas.width;
   const height = canvas.height;
-  const stats = exceedanceStats();
-  const rows = stats.rows;
+  const metric = els.calendarMetric.value;
+  const unit = metricUnit(metric);
+  const info = monthInfo();
+  const series = comparisonSeries();
+  const allValues = series.flatMap((item) => item.values.map((row) => row[metric]));
+  const threshold = thresholds()[metric];
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#fbfbfa";
   ctx.fillRect(0, 0, width, height);
 
-  const padding = { left: 56, right: 22, top: 24, bottom: 48 };
-  const plotW = width - padding.left - padding.right;
-  const plotH = height - padding.top - padding.bottom;
-  const values = rows.flatMap((row) => [row.air, row.heat, row.noise]).filter((value) => value !== null);
-  const maxValue = Math.max(100, ...values);
+  const { padding, plotW, plotH } = trendChartGeometry(canvas);
+  const maxValue = Math.max(threshold || 0, ...allValues, metric === "heat" ? 100 : 10);
+  const standardMax = standardChartCeiling(metric, maxValue);
+  const chartMax = Math.ceil((Math.max(maxValue, standardMax) * 1.12) / 10) * 10;
+  const rowsByCluster = new Map(series.map((item) => [item.cluster, new Map(item.rows.map((row) => [Number(row.date.slice(-2)), row]))]));
+
+  drawStandardBands(ctx, metric, padding, plotW, plotH, chartMax);
 
   ctx.strokeStyle = "#d3d8da";
   ctx.lineWidth = 1;
   ctx.fillStyle = colors.muted;
   ctx.font = "14px Inter, sans-serif";
+  ctx.textAlign = "right";
   for (let i = 0; i <= 4; i += 1) {
     const y = padding.top + (plotH / 4) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
-    ctx.fillText(String(Math.round(maxValue - (maxValue / 4) * i)), 10, y + 4);
+    ctx.fillText(String(Math.round(chartMax - (chartMax / 4) * i)), padding.left - 12, y + 4);
   }
 
-  function drawLine(key, color) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 4;
+  if (state.trendHoverDay) {
+    const hoverX = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (state.trendHoverDay - 1));
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "rgba(17, 24, 39, 0.7)";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    rows.forEach((row, index) => {
-      if (row[key] === null) return;
-      const x = padding.left + (rows.length <= 1 ? 0 : (plotW / (rows.length - 1)) * index);
-      const y = padding.top + plotH - (row[key] / maxValue) * plotH;
-      if (index === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
+    ctx.moveTo(hoverX, padding.top);
+    ctx.lineTo(hoverX, padding.top + plotH);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  drawLine("air", colors.air);
-  drawLine("heat", colors.heat);
-  drawLine("noise", colors.noise);
+  if (threshold) {
+    const thresholdY = padding.top + plotH - (threshold / chartMax) * plotH;
+    ctx.setLineDash([8, 7]);
+    ctx.strokeStyle = "#7b8288";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, thresholdY);
+    ctx.lineTo(width - padding.right, thresholdY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#4d555d";
+    ctx.textAlign = "left";
+    ctx.fillText(`Threshold ${threshold} ${unit}`, padding.left + 10, thresholdY - 8);
+  }
 
-  ctx.fillStyle = colors.muted;
-  rows.forEach((row, index) => {
-    if (index % Math.ceil(Math.max(rows.length, 1) / 8) !== 0) return;
-    const day = Number(row.date.slice(-2));
-    const x = padding.left + (rows.length <= 1 ? 0 : (plotW / (rows.length - 1)) * index);
-    ctx.fillText(String(day), x - 5, height - 18);
+  const traceSeriesLine = (item) => {
+    ctx.beginPath();
+    let hasPoint = false;
+    for (let day = 1; day <= info.days; day += 1) {
+      const row = rowsByCluster.get(item.cluster)?.get(day);
+      const value = row?.[metric];
+      if (value === null || value === undefined) {
+        hasPoint = false;
+        continue;
+      }
+      const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
+      const y = padding.top + plotH - (value / chartMax) * plotH;
+      if (!hasPoint) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      hasPoint = true;
+    }
+  };
+
+  series.forEach((item) => {
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    traceSeriesLine(item);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.82)";
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    traceSeriesLine(item);
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.fillStyle = item.color;
+    item.rows.forEach((row) => {
+      const value = row[metric];
+      if (value === null || value === undefined) return;
+      const day = Number(row.date.slice(-2));
+      const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
+      const y = padding.top + plotH - (value / chartMax) * plotH;
+      const isHovered = state.trendHoverDay === day;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.beginPath();
+      ctx.arc(x, y, isHovered ? 6 : 4.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = item.color;
+      ctx.beginPath();
+      ctx.arc(x, y, isHovered ? 4.2 : 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
   });
 
-  if (!rows.length) {
+  ctx.fillStyle = colors.muted;
+  ctx.textAlign = "center";
+  for (let day = 1; day <= info.days; day += 1) {
+    if (day !== 1 && day !== info.days && day % 5 !== 0) continue;
+    const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
+    ctx.fillText(String(day), x, height - 22);
+  }
+  ctx.textAlign = "left";
+  ctx.fillText("Day of month", padding.left, height - 8);
+
+  if (!allValues.length) {
     ctx.fillStyle = colors.muted;
     ctx.font = "24px Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("Upload a CSV or load the sample data", width / 2, height / 2);
     ctx.textAlign = "start";
   }
+}
+
+function hideTrendTooltip() {
+  state.trendHoverDay = null;
+  if (els.trendTooltip) els.trendTooltip.hidden = true;
+  renderTrendChart();
+}
+
+function updateTrendTooltip(event) {
+  const canvas = els.trendChart;
+  const tooltip = els.trendTooltip;
+  if (!canvas || !tooltip) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+  const { padding, plotW, plotH } = trendChartGeometry(canvas);
+  if (x < padding.left || x > padding.left + plotW || y < padding.top || y > padding.top + plotH) {
+    hideTrendTooltip();
+    return;
+  }
+
+  const info = monthInfo();
+  const day = Math.max(1, Math.min(info.days, Math.round(((x - padding.left) / plotW) * (info.days - 1)) + 1));
+  const metric = els.calendarMetric.value;
+  const values = comparisonValuesForDay(day);
+  if (!values.some((item) => item.value !== null && item.value !== undefined)) {
+    hideTrendTooltip();
+    return;
+  }
+
+  if (state.trendHoverDay !== day) {
+    state.trendHoverDay = day;
+    renderTrendChart();
+  }
+
+  const date = new Date(info.year, info.month - 1, day).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
+  tooltip.innerHTML = `
+    <strong>${date}</strong>
+    <span>${escapeHtml(metricDisplay(metric))}</span>
+    ${values.map((item) => `
+      <div class="tooltip-row">
+        <i style="background:${item.color}"></i>
+        <span>${escapeHtml(item.cluster)}</span>
+        <b>${escapeHtml(formatMetricTooltipValue(item.value, metric))}</b>
+      </div>
+    `).join("")}
+  `;
+  tooltip.hidden = false;
+
+  const panelRect = tooltip.parentElement.getBoundingClientRect();
+  const tooltipWidth = tooltip.offsetWidth || 230;
+  const tooltipHeight = tooltip.offsetHeight || 150;
+  const left = Math.min(Math.max(event.clientX - panelRect.left + 14, 8), panelRect.width - tooltipWidth - 8);
+  const top = Math.min(Math.max(event.clientY - panelRect.top + 14, 8), panelRect.height - tooltipHeight - 8);
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 
 function renderScene(canvas) {
@@ -747,11 +1023,41 @@ function formatReportDate(value) {
   return date.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" });
 }
 
+function updateComparisonSummary() {
+  const metric = els.calendarMetric.value;
+  const metricName = metricDisplay(metric);
+  const unit = metricUnit(metric);
+  const series = comparisonSeries();
+  const withPeaks = series.filter((item) => item.peak !== null);
+  const withAverages = series.filter((item) => item.average !== null);
+  const peak = withPeaks.sort((a, b) => b.peak - a.peak)[0];
+  const average = withAverages.sort((a, b) => b.average - a.average)[0];
+  const comparedDays = Math.max(0, ...series.map((item) => item.values.length));
+
+  document.getElementById("comparisonMetricTitle").textContent = `${metricName} by Location`;
+  document.getElementById("comparisonPeakLabel").textContent = `Highest daily average ${metricName}`;
+  document.getElementById("comparisonAverageLabel").textContent = `Highest monthly average ${metricName}`;
+  document.getElementById("comparisonPeakLocation").textContent = peak ? `${peak.cluster}: ${peak.peak} ${unit}` : "--";
+  document.getElementById("comparisonAverageLocation").textContent = average ? `${average.cluster}: ${average.average} ${unit}` : "--";
+  document.getElementById("comparisonCoverage").textContent = series.length ? `${series.length} locations / ${comparedDays} days` : "--";
+
+  els.comparisonLegend.innerHTML = "";
+  series.forEach((item) => {
+    const legendItem = document.createElement("span");
+    const swatch = document.createElement("i");
+    swatch.style.background = item.color;
+    legendItem.append(swatch, document.createTextNode(item.cluster));
+    els.comparisonLegend.append(legendItem);
+  });
+}
+
 function updateText() {
   const info = monthInfo();
   const stats = exceedanceStats();
   const title = els.title.value.trim() || "Composite Calendar";
   const location = els.location.value || "Sensor Site";
+  const comparedLocations = selectedComparisonLocations();
+  const comparedLocationText = comparedLocations.length > 1 ? `${comparedLocations.length} locations` : (comparedLocations[0] || location);
   const catchphrase = els.catchphrase.value.trim() || `What's going on in ${location}?`;
   const author = els.author.value.trim() || "Name";
   const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
@@ -760,14 +1066,23 @@ function updateText() {
   document.getElementById("reportCatchphrasePreview").textContent = catchphrase;
   document.getElementById("reportPhotoTitle").textContent = location;
   document.getElementById("reportMeta").textContent = `Prepared by ${author} on ${reportDate}`;
+  document.getElementById("trendCatchphrasePreview").textContent = catchphrase;
+  document.getElementById("trendPhotoTitle").textContent = comparedLocationText;
+  document.getElementById("trendMeta").textContent = `Prepared by ${author} on ${reportDate}`;
   document.getElementById("calendarMonth").textContent = info.long;
+  document.getElementById("trendMonth").textContent = info.long;
   els.previewCluster.textContent = location;
+  document.getElementById("trendLocationList").textContent = comparedLocations.join(", ") || "No locations selected";
   const userNote = els.generalInfo.value.trim();
   if (document.activeElement !== els.notePreview) {
     els.notePreview.textContent = userNote || "Type in your comments/stories/lived experience here";
   }
+  const trendNote = document.getElementById("trendNotePreview");
+  if (document.activeElement !== trendNote) {
+    trendNote.textContent = userNote || "Type in your comments/stories/lived experience here";
+  }
   els.notePreview.classList.toggle("empty-note", !userNote);
-  document.getElementById("trendSubhead").textContent = `${location} in ${info.long}`;
+  trendNote.classList.toggle("empty-note", !userNote);
   document.getElementById("snapshotSubhead").textContent = `${location} sensor context and interpretation notes.`;
   document.getElementById("snapshotLocation").textContent = location;
   document.getElementById("snapshotNotes").textContent = userNote || "Type in your comments/stories/lived experience here";
@@ -776,9 +1091,7 @@ function updateText() {
   document.getElementById("heatSummary").textContent = plural(heatStats.exceedanceDays, "exceedance day");
   document.getElementById("peakHeatSummary").textContent = heatStats.maxHeat === null ? "--" : `${heatStats.maxHeat} °F`;
   document.getElementById("dangerHeatSummary").textContent = plural(heatStats.dangerDays, "day");
-  document.getElementById("maxAir").textContent = stats.max.air === null ? "--" : `${stats.max.air} ug/m3`;
-  document.getElementById("maxHeat").textContent = stats.max.heat === null ? "--" : `${stats.max.heat} °F`;
-  document.getElementById("maxNoise").textContent = stats.max.noise === null ? "--" : `${stats.max.noise} dB`;
+  updateComparisonSummary();
 
   document.getElementById("airThresholdCell").textContent = `${els.airThreshold.value} ug/m3`;
   document.getElementById("heatThresholdCell").textContent = `${els.heatThreshold.value} °F`;
@@ -804,6 +1117,7 @@ function render() {
 
 function setTemplate(template) {
   state.template = template;
+  if (template !== "trends") hideTrendTooltip();
   document.querySelectorAll(".template-tab").forEach((button) => {
     const active = button.dataset.template === template;
     button.classList.toggle("is-active", active);
@@ -811,6 +1125,9 @@ function setTemplate(template) {
   });
   document.querySelectorAll("[data-template-panel]").forEach((panel) => {
     panel.classList.toggle("is-visible", panel.dataset.templatePanel === template);
+  });
+  document.querySelectorAll("[data-template-control]").forEach((control) => {
+    control.hidden = control.dataset.templateControl !== template;
   });
 }
 
@@ -828,6 +1145,15 @@ els.notePreview.addEventListener("input", () => {
   els.generalInfo.value = els.notePreview.textContent;
   render();
 });
+
+document.getElementById("trendNotePreview").addEventListener("input", () => {
+  els.generalInfo.value = document.getElementById("trendNotePreview").textContent;
+  render();
+});
+
+els.trendChart.addEventListener("pointermove", updateTrendTooltip);
+els.trendChart.addEventListener("pointerleave", hideTrendTooltip);
+els.trendChart.addEventListener("pointerdown", updateTrendTooltip);
 
 els.pictureSelect.addEventListener("change", () => {
   state.imageChoice = els.pictureSelect.value;
@@ -876,4 +1202,5 @@ document.getElementById("printBtn").addEventListener("click", () => window.print
 state.rows = sampleRows;
 preloadPictureAssets();
 updateClusterOptions("Sample Cluster 1");
+setTemplate(state.template);
 render();
