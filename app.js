@@ -6,6 +6,7 @@ const state = {
   builtInImages: {},
   comparisonLocations: [],
   trendHoverDay: null,
+  noteHtml: "",
 };
 
 const els = {
@@ -1075,12 +1076,13 @@ function updateText() {
   els.previewCluster.textContent = location;
   document.getElementById("trendLocationList").textContent = comparedLocations.join(", ") || "No locations selected";
   const userNote = els.generalInfo.value.trim();
+  const noteHtml = state.noteHtml || escapeHtml(userNote || "Type in your comments/stories/lived experience here");
   if (document.activeElement !== els.notePreview) {
-    els.notePreview.textContent = userNote || "Type in your comments/stories/lived experience here";
+    els.notePreview.innerHTML = noteHtml;
   }
   const trendNote = document.getElementById("trendNotePreview");
   if (document.activeElement !== trendNote) {
-    trendNote.textContent = userNote || "Type in your comments/stories/lived experience here";
+    trendNote.innerHTML = noteHtml;
   }
   els.notePreview.classList.toggle("empty-note", !userNote);
   trendNote.classList.toggle("empty-note", !userNote);
@@ -1116,6 +1118,46 @@ function render() {
   renderScene(els.snapshotScene);
 }
 
+function syncNoteFromEditor(editor) {
+  state.noteHtml = editor.innerHTML;
+  els.generalInfo.value = editor.textContent;
+  render();
+}
+
+function applyNoteCommand(editor, command, value = null) {
+  editor.focus();
+  document.execCommand(command, false, value);
+  syncNoteFromEditor(editor);
+}
+
+function applyNoteFontSize(editor, size) {
+  editor.focus();
+  document.execCommand("fontSize", false, "7");
+  editor.querySelectorAll('font[size="7"]').forEach((font) => {
+    const span = document.createElement("span");
+    span.style.fontSize = `${size}px`;
+    while (font.firstChild) span.append(font.firstChild);
+    font.replaceWith(span);
+  });
+  syncNoteFromEditor(editor);
+}
+
+function setupNoteEditor({ editor, toolbar, fontFamilySelect, fontSizeSelect, clearButton }) {
+  if (!editor || !toolbar) return;
+
+  editor.addEventListener("input", () => syncNoteFromEditor(editor));
+
+  toolbar.querySelectorAll("[data-command]").forEach((button) => {
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => applyNoteCommand(editor, button.dataset.command));
+  });
+
+  fontFamilySelect?.addEventListener("change", () => applyNoteCommand(editor, "fontName", fontFamilySelect.value));
+  fontSizeSelect?.addEventListener("change", () => applyNoteFontSize(editor, fontSizeSelect.value));
+  clearButton?.addEventListener("mousedown", (event) => event.preventDefault());
+  clearButton?.addEventListener("click", () => applyNoteCommand(editor, "removeFormat"));
+}
+
 function setTemplate(template) {
   state.template = template;
   if (template !== "trends") hideTrendTooltip();
@@ -1142,14 +1184,20 @@ document.querySelectorAll(".template-tab").forEach((button) => {
   });
 });
 
-els.notePreview.addEventListener("input", () => {
-  els.generalInfo.value = els.notePreview.textContent;
-  render();
+setupNoteEditor({
+  editor: els.notePreview,
+  toolbar: els.notePreview.previousElementSibling,
+  fontFamilySelect: document.getElementById("noteFontFamily"),
+  fontSizeSelect: document.getElementById("noteFontSize"),
+  clearButton: document.getElementById("noteClearFormat"),
 });
 
-document.getElementById("trendNotePreview").addEventListener("input", () => {
-  els.generalInfo.value = document.getElementById("trendNotePreview").textContent;
-  render();
+setupNoteEditor({
+  editor: document.getElementById("trendNotePreview"),
+  toolbar: document.getElementById("trendNotePreview").previousElementSibling,
+  fontFamilySelect: document.getElementById("trendNoteFontFamily"),
+  fontSizeSelect: document.getElementById("trendNoteFontSize"),
+  clearButton: document.getElementById("trendNoteClearFormat"),
 });
 
 els.trendChart.addEventListener("pointermove", updateTrendTooltip);
