@@ -507,6 +507,27 @@ function heatSummaryStats(rows) {
   };
 }
 
+function metricSummaryStats(rows, metric) {
+  const limits = thresholds();
+  const metricRows = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
+  const bands = new Map();
+
+  metricRows.forEach((row) => {
+    const severity = rowSeverity(row, metric, limits);
+    const band = standardBand(metric, row, severity);
+    if (!bands.has(band.label)) {
+      bands.set(band.label, { label: band.label, count: 0, color: band.color });
+    }
+    bands.get(band.label).count += 1;
+  });
+
+  return {
+    exceedanceDays: metricRows.filter((row) => row[metric] >= limits[metric]).length,
+    maxValue: metricRows.length ? Math.max(...metricRows.map((row) => row[metric])) : null,
+    topBand: Array.from(bands.values()).sort((a, b) => b.count - a.count)[0] || null,
+  };
+}
+
 function rowSeverity(row, metric, limits) {
   if (!row) return null;
 
@@ -1090,10 +1111,16 @@ function updateText() {
   document.getElementById("snapshotLocation").textContent = location;
   document.getElementById("snapshotNotes").textContent = userNote || "Type in your comments/stories/lived experience here";
 
-  const heatStats = heatSummaryStats(stats.rows);
-  document.getElementById("heatSummary").textContent = plural(heatStats.exceedanceDays, "exceedance day");
-  document.getElementById("peakHeatSummary").textContent = heatStats.maxHeat === null ? "--" : `${heatStats.maxHeat} °F`;
-  document.getElementById("dangerHeatSummary").textContent = plural(heatStats.dangerDays, "day");
+  const selectedMetric = els.calendarMetric.value;
+  const selectedMetricName = metricDisplay(selectedMetric);
+  const selectedMetricUnit = metricUnit(selectedMetric);
+  const selectedMetricStats = metricSummaryStats(stats.rows, selectedMetric);
+  document.getElementById("metricSummaryLabel").textContent = `${selectedMetricName} exceedance days for ${info.short}.`;
+  document.getElementById("peakMetricSummaryLabel").textContent = `Highest daily average ${selectedMetricName} for ${info.short}.`;
+  document.getElementById("riskMetricSummaryLabel").textContent = `Most common ${selectedMetricName} standard category for ${info.short}.`;
+  document.getElementById("heatSummary").textContent = plural(selectedMetricStats.exceedanceDays, "exceedance day");
+  document.getElementById("peakHeatSummary").textContent = selectedMetricStats.maxValue === null ? "--" : `${selectedMetricStats.maxValue} ${selectedMetricUnit}`;
+  document.getElementById("dangerHeatSummary").textContent = selectedMetricStats.topBand ? `${selectedMetricStats.topBand.label}: ${plural(selectedMetricStats.topBand.count, "day")}` : "--";
   updateComparisonSummary();
 
   document.getElementById("airThresholdCell").textContent = `${els.airThreshold.value} ug/m3`;
