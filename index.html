@@ -66,7 +66,7 @@
               <option value="noise">Noise</option>
             </select>
           </label>
-          <label>
+          <label data-template-control="composite">
             Sensor or sensor cluster
             <select id="locationName">
               <option value="Sample Cluster 1">Sample Cluster 1</option>
@@ -76,9 +76,22 @@
               <option value="Sample Cluster 5">Sample Cluster 5</option>
             </select>
           </label>
+          <div class="sensor-search" data-template-control="composite">
+            <input id="sensorSearch" type="search" placeholder="Search sensors" autocomplete="off" aria-controls="sensorSearchResults">
+            <button id="sensorSearchBtn" type="button">Search</button>
+            <div id="sensorSearchResults" class="sensor-search-results" role="listbox" hidden></div>
+          </div>
           <div class="field-group" data-template-control="trends" hidden>
             <p class="field-label">Comparison locations</p>
-            <div id="comparisonLocations" class="check-list" aria-label="Comparison locations"></div>
+            <div class="comparison-picker">
+              <div class="sensor-search comparison-search">
+                <input id="comparisonSearch" type="search" placeholder="Search sensors or groups" autocomplete="off" aria-controls="comparisonSearchResults">
+                <button id="comparisonSearchBtn" type="button">Add</button>
+                <div id="comparisonSearchResults" class="sensor-search-results" role="listbox" hidden></div>
+              </div>
+              <div id="comparisonSelected" class="comparison-selected" aria-label="Selected comparison locations"></div>
+            </div>
+            <div id="comparisonLocations" class="check-list" aria-label="Comparison locations" hidden></div>
           </div>
         </section>
 
@@ -244,7 +257,6 @@
               <div class="calendar-heading comparison-heading">
                 <div class="calendar-title-block">
                   <h3 id="trendMonth">June 2026</h3>
-                  <p id="trendLocationList" class="cluster-preview-text">Sample Cluster 1, Sample Cluster 2, Sample Cluster 3</p>
                 </div>
                 <div class="standards-wrap">
                   <p class="standards-title" id="comparisonMetricTitle">Heat Index by Location</p>

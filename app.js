@@ -4,6 +4,7 @@ const state = {
   imageChoice: "grove",
   uploadedImage: null,
   builtInImages: {},
+  sensorCatalog: [],
   comparisonLocations: [],
   trendHoverDay: null,
   noteHtml: "",
@@ -26,6 +27,13 @@ const els = {
   heatThreshold: document.getElementById("heatThreshold"),
   noiseThreshold: document.getElementById("noiseThreshold"),
   calendarMetric: document.getElementById("calendarMetric"),
+  sensorSearch: document.getElementById("sensorSearch"),
+  sensorSearchBtn: document.getElementById("sensorSearchBtn"),
+  sensorSearchResults: document.getElementById("sensorSearchResults"),
+  comparisonSearch: document.getElementById("comparisonSearch"),
+  comparisonSearchBtn: document.getElementById("comparisonSearchBtn"),
+  comparisonSearchResults: document.getElementById("comparisonSearchResults"),
+  comparisonSelected: document.getElementById("comparisonSelected"),
   comparisonLocations: document.getElementById("comparisonLocations"),
   comparisonLegend: document.getElementById("comparisonLegend"),
   previewCluster: document.getElementById("calendarLocation"),
@@ -63,6 +71,161 @@ const metricLabels = {
 const pictureAssets = {
   grove: "assets/Grove Hall.avif",
 };
+
+const builtInSensorCatalog = [
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01486", "filterId": "MOD-PM-01486", "displayId": "MOD-PM-01486", "name": "Blue Hill Ave @ Fayston St (Removed)"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01487", "filterId": "MOD-PM-01487", "displayId": "MOD-PM-01487", "name": "Blue Hill Ave @ Otisfield St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01488", "filterId": "MOD-PM-01488", "displayId": "MOD-PM-01488", "name": "Blue Hill Ave @ Moreland St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01489", "filterId": "MOD-PM-01489", "displayId": "MOD-PM-01489", "name": "Lewis Place"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01490", "filterId": "MOD-PM-01490", "displayId": "MOD-PM-01490", "name": "Blue Hill Ave @ Intervale St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01492", "filterId": "MOD-PM-01492", "displayId": "MOD-PM-01492", "name": "Blue Hill Ave @ Grove Hall"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01493", "filterId": "MOD-PM-01493", "displayId": "MOD-PM-01493", "name": "Blue Hill Ave @ Dudley Square Plaza"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01494", "filterId": "MOD-PM-01494", "displayId": "MOD-PM-01494", "name": "Blue Hill Ave @ Southwood St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01495", "filterId": "MOD-PM-01495", "displayId": "MOD-PM-01495", "name": "Blue Hill Ave @ Woodcliff St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01491", "filterId": "MOD-PM-01491", "displayId": "MOD-PM-01491", "name": "Horatio Harris Park"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01550", "filterId": "MOD-PM-01550", "displayId": "MOD-PM-01550", "name": "Julian Street"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01549", "filterId": "MOD-PM-01549", "displayId": "MOD-PM-01549", "name": "Kroc Center"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01593", "filterId": "MOD-PM-01593", "displayId": "MOD-PM-01593", "name": "Blue Hill Ave @ Fayston St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01548", "filterId": "MOD-PM-01548", "displayId": "MOD-PM-01548", "name": "Seaver and Walnut"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01592", "filterId": "MOD-PM-01592", "displayId": "MOD-PM-01592", "name": "Trotter Elementary"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01594", "filterId": "MOD-PM-01594", "displayId": "MOD-PM-01594", "name": "Elm Hill Ave and Wenonah St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01595", "filterId": "MOD-PM-01595", "displayId": "MOD-PM-01595", "name": "Humboldt and Seaver"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01596", "filterId": "MOD-PM-01596", "displayId": "MOD-PM-01596", "name": "Forest St and Vine St"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01597", "filterId": "MOD-PM-01597", "displayId": "MOD-PM-01597", "name": "Ruthven and Humboldt"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01598", "filterId": "MOD-PM-01598", "displayId": "MOD-PM-01598", "name": "Ceylon Park"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01599", "filterId": "MOD-PM-01599", "displayId": "MOD-PM-01599", "name": "Elm Hill Park"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01600", "filterId": "MOD-PM-01600", "displayId": "MOD-PM-01600", "name": "Normandy St near Geneva Ave"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01601", "filterId": "MOD-PM-01601", "displayId": "MOD-PM-01601", "name": "Marshfield St and Batchelder St"},
+  {"group": "Noise Sensors", "id": "noise:1", "filterId": "1", "displayId": "Noise Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park"},
+  {"group": "Noise Sensors", "id": "noise:2", "filterId": "2", "displayId": "Noise Sensor 2", "name": "Blue Hill @ Seaver St"},
+  {"group": "Noise Sensors", "id": "noise:3", "filterId": "3", "displayId": "Noise Sensor 3", "name": "Dudley @ Fcottage"},
+  {"group": "Noise Sensors", "id": "noise:4", "filterId": "4", "displayId": "Noise Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)"},
+  {"group": "Noise Sensors", "id": "noise:5", "filterId": "5", "displayId": "Noise Sensor 5", "name": "George @ Shirley"},
+  {"group": "Noise Sensors", "id": "noise:6", "filterId": "6", "displayId": "Noise Sensor 6", "name": "Waverly @ Warren"},
+  {"group": "Noise Sensors", "id": "noise:7", "filterId": "7", "displayId": "Noise Sensor 7", "name": "Kroc Centre"},
+  {"group": "Noise Sensors", "id": "noise:8", "filterId": "8", "displayId": "Noise Sensor 8", "name": "Magnolia @ Lingard"},
+  {"group": "Noise Sensors", "id": "noise:10", "filterId": "10", "displayId": "Noise Sensor 10", "name": "Magnolia @ Wayland"},
+  {"group": "Noise Sensors", "id": "noise:11", "filterId": "11", "displayId": "Noise Sensor 11", "name": "Hollander st"},
+  {"group": "Noise Sensors", "id": "noise:12", "filterId": "12", "displayId": "Noise Sensor 12", "name": "Blue Hill @ Maywood"},
+  {"group": "Noise Sensors", "id": "noise:13", "filterId": "13", "displayId": "Noise Sensor 13", "name": "Blue Hill @ Quincy"},
+  {"group": "Noise Sensors", "id": "noise:15", "filterId": "15", "displayId": "Noise Sensor 15", "name": "Moreland st @ learning together day care"},
+  {"group": "Noise Sensors", "id": "noise:16", "filterId": "16", "displayId": "Noise Sensor 16", "name": "Warren @ Townsend/Quincy"},
+  {"group": "Noise Sensors", "id": "noise:17", "filterId": "17", "displayId": "Noise Sensor 17", "name": "Sargent st"},
+  {"group": "Noise Sensors", "id": "noise:18", "filterId": "18", "displayId": "Noise Sensor 18", "name": "Elm Hill Ave"},
+  {"group": "Noise Sensors", "id": "noise:19", "filterId": "19", "displayId": "Noise Sensor 19", "name": "Quincy @ Dacia"},
+  {"group": "Noise Sensors", "id": "noise:20", "filterId": "20", "displayId": "Noise Sensor 20", "name": "Schuyler st"},
+  {"group": "Noise Sensors", "id": "noise:21", "filterId": "21", "displayId": "Noise Sensor 21", "name": "Blue Hill @ Columbia Road"},
+  {"group": "Noise Sensors", "id": "noise:22", "filterId": "22", "displayId": "Noise Sensor 22", "name": "Sonoma St"},
+  {"group": "Noise Sensors", "id": "noise:23", "filterId": "23", "displayId": "Noise Sensor 23", "name": "Freedom House Warren St"},
+  {"group": "Noise Sensors", "id": "noise:24", "filterId": "24", "displayId": "Noise Sensor 24", "name": "Samuel W. Mason Elementary"},
+  {"group": "Noise Sensors", "id": "noise:25", "filterId": "25", "displayId": "Noise Sensor 25", "name": "Geneva @ Blue Hill"},
+  {"group": "Noise Sensors", "id": "noise:26", "filterId": "26", "displayId": "Noise Sensor 26", "name": "Franklin Park"},
+  {"group": "Noise Sensors", "id": "noise:27", "filterId": "27", "displayId": "Noise Sensor 27", "name": "Dunreath St"},
+  {"group": "Noise Sensors", "id": "noise:28", "filterId": "28", "displayId": "Noise Sensor 28", "name": "Other Dudley Commons"},
+  {"group": "Noise Sensors", "id": "noise:29", "filterId": "29", "displayId": "Noise Sensor 29", "name": "Langdon St Farm"},
+  {"group": "Noise Sensors", "id": "noise:30", "filterId": "30", "displayId": "Noise Sensor 30", "name": "E. Cottage & Batchelder St"},
+  {"group": "Noise Sensors", "id": "noise:32", "filterId": "32", "displayId": "Noise Sensor 32", "name": "Normandy and Stanwood"},
+  {"group": "Noise Sensors", "id": "noise:33", "filterId": "33", "displayId": "Noise Sensor 33", "name": "Weldon St and Gannet St"},
+  {"group": "Noise Sensors", "id": "noise:34", "filterId": "34", "displayId": "Noise Sensor 34", "name": "Homestead and Harold"},
+  {"group": "Noise Sensors", "id": "noise:35", "filterId": "35", "displayId": "Noise Sensor 35", "name": "Ruthven and Humboldt"},
+  {"group": "Noise Sensors", "id": "noise:36", "filterId": "36", "displayId": "Noise Sensor 36", "name": "Waumbeck and Warren"},
+  {"group": "Noise Sensors", "id": "noise:37", "filterId": "37", "displayId": "Noise Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)"},
+  {"group": "Noise Sensors", "id": "noise:38", "filterId": "38", "displayId": "Noise Sensor 38", "name": "Elm Hill and Crawford"},
+  {"group": "Noise Sensors", "id": "noise:39", "filterId": "39", "displayId": "Noise Sensor 39", "name": "Batchelder and Marshfield"},
+  {"group": "Noise Sensors", "id": "noise:40", "filterId": "40", "displayId": "Noise Sensor 40", "name": "Hampden and Eustis"},
+  {"group": "Noise Sensors", "id": "noise:41", "filterId": "41", "displayId": "Noise Sensor 41", "name": "Forest St and Vine St"},
+  {"group": "Noise Sensors", "id": "noise:43", "filterId": "43", "displayId": "Noise Sensor 43", "name": "W.Cottage and Brook"},
+  {"group": "Noise Sensors", "id": "noise:44", "filterId": "44", "displayId": "Noise Sensor 44", "name": "Washington St and Bishop Joe L. Smith"},
+  {"group": "Noise Sensors", "id": "noise:45", "filterId": "45", "displayId": "Noise Sensor 45", "name": "Children's Park (Intervale and Normandy)"},
+  {"group": "Noise Sensors", "id": "noise:46", "filterId": "46", "displayId": "Noise Sensor 46", "name": "Bynoe Park"},
+  {"group": "Noise Sensors", "id": "noise:47", "filterId": "47", "displayId": "Noise Sensor 47", "name": "Elm Hill and Cheney"},
+  {"group": "Noise Sensors", "id": "noise:48", "filterId": "48", "displayId": "Noise Sensor 48", "name": "Quincy and Magnolia"},
+  {"group": "Noise Sensors", "id": "noise:49", "filterId": "49", "displayId": "Noise Sensor 49", "name": "Moreland St, Howes Playground"},
+  {"group": "Noise Sensors", "id": "noise:50", "filterId": "50", "displayId": "Noise Sensor 50", "name": "Warren Pl"},
+  {"group": "Noise Sensors", "id": "noise:51", "filterId": "51", "displayId": "Noise Sensor 51", "name": "Normandy and Seaver"},
+  {"group": "Noise Sensors", "id": "noise:52", "filterId": "52", "displayId": "Noise Sensor 52", "name": "Winthrop Playground"},
+  {"group": "Noise Sensors", "id": "noise:53", "filterId": "53", "displayId": "Noise Sensor 53", "name": "Dennis St Park"},
+  {"group": "Noise Sensors", "id": "noise:54", "filterId": "54", "displayId": "Noise Sensor 54", "name": "Freedom House Warren St"},
+  {"group": "Noise Sensors", "id": "noise:55", "filterId": "55", "displayId": "Noise Sensor 55", "name": "Fayston and Perth"},
+  {"group": "Noise Sensors", "id": "noise:9", "filterId": "9", "displayId": "Noise Sensor 9", "name": "Savin & Tupelo"},
+  {"group": "Heat Sensors", "id": "heat:1", "filterId": "1", "displayId": "Heat Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park"},
+  {"group": "Heat Sensors", "id": "heat:2", "filterId": "2", "displayId": "Heat Sensor 2", "name": "Blue Hill @ Seaver St"},
+  {"group": "Heat Sensors", "id": "heat:3", "filterId": "3", "displayId": "Heat Sensor 3", "name": "Dudley @ Fcottage"},
+  {"group": "Heat Sensors", "id": "heat:4", "filterId": "4", "displayId": "Heat Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)"},
+  {"group": "Heat Sensors", "id": "heat:5", "filterId": "5", "displayId": "Heat Sensor 5", "name": "George @ Shirley"},
+  {"group": "Heat Sensors", "id": "heat:6", "filterId": "6", "displayId": "Heat Sensor 6", "name": "Waverly @ Warren"},
+  {"group": "Heat Sensors", "id": "heat:7", "filterId": "7", "displayId": "Heat Sensor 7", "name": "Kroc Centre"},
+  {"group": "Heat Sensors", "id": "heat:8", "filterId": "8", "displayId": "Heat Sensor 8", "name": "Magnolia @ Lingard"},
+  {"group": "Heat Sensors", "id": "heat:10", "filterId": "10", "displayId": "Heat Sensor 10", "name": "Magnolia @ Wayland"},
+  {"group": "Heat Sensors", "id": "heat:11", "filterId": "11", "displayId": "Heat Sensor 11", "name": "Hollander st"},
+  {"group": "Heat Sensors", "id": "heat:12", "filterId": "12", "displayId": "Heat Sensor 12", "name": "Blue Hill @ Maywood"},
+  {"group": "Heat Sensors", "id": "heat:13", "filterId": "13", "displayId": "Heat Sensor 13", "name": "Blue Hill @ Quincy"},
+  {"group": "Heat Sensors", "id": "heat:15", "filterId": "15", "displayId": "Heat Sensor 15", "name": "Moreland st @ learning together day care"},
+  {"group": "Heat Sensors", "id": "heat:16", "filterId": "16", "displayId": "Heat Sensor 16", "name": "Warren @ Townsend/Quincy"},
+  {"group": "Heat Sensors", "id": "heat:17", "filterId": "17", "displayId": "Heat Sensor 17", "name": "Sargent st"},
+  {"group": "Heat Sensors", "id": "heat:18", "filterId": "18", "displayId": "Heat Sensor 18", "name": "Elm Hill Ave"},
+  {"group": "Heat Sensors", "id": "heat:19", "filterId": "19", "displayId": "Heat Sensor 19", "name": "Quincy @ Dacia"},
+  {"group": "Heat Sensors", "id": "heat:20", "filterId": "20", "displayId": "Heat Sensor 20", "name": "Schuyler st"},
+  {"group": "Heat Sensors", "id": "heat:21", "filterId": "21", "displayId": "Heat Sensor 21", "name": "Blue Hill @ Columbia Road"},
+  {"group": "Heat Sensors", "id": "heat:22", "filterId": "22", "displayId": "Heat Sensor 22", "name": "Sonoma St"},
+  {"group": "Heat Sensors", "id": "heat:23", "filterId": "23", "displayId": "Heat Sensor 23", "name": "Freedom House Warren St"},
+  {"group": "Heat Sensors", "id": "heat:24", "filterId": "24", "displayId": "Heat Sensor 24", "name": "Samuel W. Mason Elementary"},
+  {"group": "Heat Sensors", "id": "heat:25", "filterId": "25", "displayId": "Heat Sensor 25", "name": "Geneva @ Blue Hill"},
+  {"group": "Heat Sensors", "id": "heat:26", "filterId": "26", "displayId": "Heat Sensor 26", "name": "Franklin Park"},
+  {"group": "Heat Sensors", "id": "heat:27", "filterId": "27", "displayId": "Heat Sensor 27", "name": "Dunreath St"},
+  {"group": "Heat Sensors", "id": "heat:28", "filterId": "28", "displayId": "Heat Sensor 28", "name": "Other Dudley Commons"},
+  {"group": "Heat Sensors", "id": "heat:29", "filterId": "29", "displayId": "Heat Sensor 29", "name": "Langdon St Farm"},
+  {"group": "Heat Sensors", "id": "heat:30", "filterId": "30", "displayId": "Heat Sensor 30", "name": "E. Cottage & Batchelder St"},
+  {"group": "Heat Sensors", "id": "heat:32", "filterId": "32", "displayId": "Heat Sensor 32", "name": "Normandy and Stanwood"},
+  {"group": "Heat Sensors", "id": "heat:33", "filterId": "33", "displayId": "Heat Sensor 33", "name": "Weldon St and Gannet St"},
+  {"group": "Heat Sensors", "id": "heat:34", "filterId": "34", "displayId": "Heat Sensor 34", "name": "Homestead and Harold"},
+  {"group": "Heat Sensors", "id": "heat:35", "filterId": "35", "displayId": "Heat Sensor 35", "name": "Ruthven and Humboldt"},
+  {"group": "Heat Sensors", "id": "heat:36", "filterId": "36", "displayId": "Heat Sensor 36", "name": "Waumbeck and Warren"},
+  {"group": "Heat Sensors", "id": "heat:37", "filterId": "37", "displayId": "Heat Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)"},
+  {"group": "Heat Sensors", "id": "heat:38", "filterId": "38", "displayId": "Heat Sensor 38", "name": "Elm Hill and Crawford"},
+  {"group": "Heat Sensors", "id": "heat:39", "filterId": "39", "displayId": "Heat Sensor 39", "name": "Batchelder and Marshfield"},
+  {"group": "Heat Sensors", "id": "heat:40", "filterId": "40", "displayId": "Heat Sensor 40", "name": "Hampden and Eustis"},
+  {"group": "Heat Sensors", "id": "heat:41", "filterId": "41", "displayId": "Heat Sensor 41", "name": "Forest St and Vine St"},
+  {"group": "Heat Sensors", "id": "heat:43", "filterId": "43", "displayId": "Heat Sensor 43", "name": "W.Cottage and Brook"},
+  {"group": "Heat Sensors", "id": "heat:44", "filterId": "44", "displayId": "Heat Sensor 44", "name": "Washington St and Bishop Joe L. Smith"},
+  {"group": "Heat Sensors", "id": "heat:45", "filterId": "45", "displayId": "Heat Sensor 45", "name": "Children's Park (Intervale and Normandy)"},
+  {"group": "Heat Sensors", "id": "heat:46", "filterId": "46", "displayId": "Heat Sensor 46", "name": "Bynoe Park"},
+  {"group": "Heat Sensors", "id": "heat:47", "filterId": "47", "displayId": "Heat Sensor 47", "name": "Elm Hill and Cheney"},
+  {"group": "Heat Sensors", "id": "heat:48", "filterId": "48", "displayId": "Heat Sensor 48", "name": "Quincy and Magnolia"},
+  {"group": "Heat Sensors", "id": "heat:49", "filterId": "49", "displayId": "Heat Sensor 49", "name": "Moreland St, Howes Playground"},
+  {"group": "Heat Sensors", "id": "heat:50", "filterId": "50", "displayId": "Heat Sensor 50", "name": "Warren Pl"},
+  {"group": "Heat Sensors", "id": "heat:51", "filterId": "51", "displayId": "Heat Sensor 51", "name": "Normandy and Seaver"},
+  {"group": "Heat Sensors", "id": "heat:52", "filterId": "52", "displayId": "Heat Sensor 52", "name": "Winthrop Playground"},
+  {"group": "Heat Sensors", "id": "heat:53", "filterId": "53", "displayId": "Heat Sensor 53", "name": "Dennis St Park"},
+  {"group": "Heat Sensors", "id": "heat:54", "filterId": "54", "displayId": "Heat Sensor 54", "name": "Freedom House Warren St"},
+  {"group": "Heat Sensors", "id": "heat:55", "filterId": "55", "displayId": "Heat Sensor 55", "name": "Fayston and Perth"},
+  {"group": "Heat Sensors", "id": "heat:9", "filterId": "9", "displayId": "Heat Sensor 9", "name": "Savin & Tupelo"},
+];
+
+const sensorCatalogSources = [
+  {
+    kind: "air",
+    label: "Air Quality Sensors",
+    path: "Air_Quality_Sensors/Air_Quality_Sensors.dbf",
+    idField: "SensorID",
+    nameField: "LocationNa",
+    typeField: "SensorType",
+  },
+  {
+    kind: "noise",
+    label: "Noise Sensors",
+    path: "Noise_Sensors/NoiseSensors.dbf",
+    idField: "Sound_sens",
+    nameField: "Location",
+  },
+  {
+    kind: "heat",
+    label: "Heat Sensors",
+    path: "Heat_Sensors_Shapefile/Heat_Sensors_Shapefile.dbf",
+    idField: "T__RH_sens",
+    nameField: "Location",
+  },
+];
 
 const heatIndexBands = [
   {
@@ -256,6 +419,76 @@ function parseCsv(text) {
   return rows;
 }
 
+function parseDbf(arrayBuffer) {
+  const view = new DataView(arrayBuffer);
+  const bytes = new Uint8Array(arrayBuffer);
+  const decoder = new TextDecoder("latin1");
+  const recordCount = view.getUint32(4, true);
+  const headerLength = view.getUint16(8, true);
+  const recordLength = view.getUint16(10, true);
+  const fields = [];
+
+  for (let offset = 32; offset + 32 <= headerLength && bytes[offset] !== 0x0d; offset += 32) {
+    const nameBytes = bytes.slice(offset, offset + 11);
+    const nullIndex = nameBytes.indexOf(0);
+    const name = decoder.decode(nameBytes.slice(0, nullIndex === -1 ? nameBytes.length : nullIndex)).trim();
+    fields.push({
+      name,
+      length: bytes[offset + 16],
+    });
+  }
+
+  const rows = [];
+  for (let index = 0; index < recordCount; index += 1) {
+    const recordStart = headerLength + index * recordLength;
+    if (bytes[recordStart] === 0x2a) continue;
+    let fieldStart = recordStart + 1;
+    const row = {};
+    fields.forEach((field) => {
+      const raw = bytes.slice(fieldStart, fieldStart + field.length);
+      row[field.name] = cleanText(decoder.decode(raw));
+      fieldStart += field.length;
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+function cleanSensorId(value) {
+  const text = cleanText(value);
+  if (!text) return "";
+  const number = Number(text);
+  if (Number.isFinite(number)) return Number.isInteger(number) ? String(number) : String(roundNumber(number));
+  return text;
+}
+
+async function loadSensorCatalog() {
+  const catalogGroups = await Promise.all(sensorCatalogSources.map(async (source) => {
+    try {
+      const response = await fetch(source.path);
+      if (!response.ok) return [];
+      const rows = parseDbf(await response.arrayBuffer());
+      return rows.map((row) => {
+        const filterId = cleanSensorId(row[source.idField]);
+        const type = cleanText(source.typeField ? row[source.typeField] : "") || source.label.replace(/s$/, "");
+        if (!filterId) return null;
+        return {
+          group: source.label,
+          id: `${source.kind}:${filterId}`,
+          filterId,
+          displayId: source.kind === "air" ? filterId : `${type} ${filterId}`,
+          name: cleanText(row[source.nameField]),
+        };
+      }).filter(Boolean);
+    } catch (error) {
+      return [];
+    }
+  }));
+
+  const loadedCatalog = catalogGroups.flat();
+  if (loadedCatalog.length) state.sensorCatalog = loadedCatalog;
+}
+
 function normalizeRows(csvRows) {
   if (csvRows.length < 2) return [];
   const headers = csvRows[0].map((header) => header.trim().toLowerCase());
@@ -339,8 +572,8 @@ function metricDisplay(metric) {
 function filteredRows() {
   const { year, month } = monthInfo();
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
-  const cluster = els.location.value;
-  const rows = state.rows.filter((row) => row.date.startsWith(prefix) && row.cluster === cluster);
+  const selection = selectedLocation();
+  const rows = state.rows.filter((row) => row.date.startsWith(prefix) && rowMatchesLocation(row, selection));
   return averageRowsByDate(rows);
 }
 
@@ -348,6 +581,13 @@ function monthRowsForCluster(cluster) {
   const { year, month } = monthInfo();
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
   return averageRowsByDate(state.rows.filter((row) => row.date.startsWith(prefix) && row.cluster === cluster));
+}
+
+function monthRowsForLocation(locationValueToRead) {
+  const { year, month } = monthInfo();
+  const prefix = `${year}-${String(month).padStart(2, "0")}`;
+  const selection = selectedLocation(locationValueToRead);
+  return averageRowsByDate(state.rows.filter((row) => row.date.startsWith(prefix) && rowMatchesLocation(row, selection)));
 }
 
 function averageRowsByDate(rows) {
@@ -396,70 +636,360 @@ function clusterOptions() {
   return Array.from(new Set(state.rows.map((row) => row.cluster).filter(Boolean))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
-function updateClusterOptions(preferredCluster = els.location.value) {
-  const clusters = clusterOptions();
-  populateClusterSelect(els.location, clusters);
-
-  const selectedCluster = clusters.includes(preferredCluster) ? preferredCluster : clusters[0];
-  if (!selectedCluster) return;
-  els.location.value = selectedCluster;
-  els.previewCluster.textContent = selectedCluster;
-  updateComparisonLocationOptions(clusters, selectedCluster);
+function selectedHazardMetric() {
+  return els.calendarMetric.value;
 }
 
-function populateClusterSelect(select, clusters) {
+function metricHasValue(row, metric = selectedHazardMetric()) {
+  return row[metric] !== null && row[metric] !== undefined;
+}
+
+function catalogSensorMatchesMetric(sensor, metric = selectedHazardMetric()) {
+  const sensorKind = sensor.id.split(":")[0];
+  if (metric === "air" || metric === "pm10") return sensorKind === "air";
+  if (metric === "heat") return sensorKind === "heat";
+  if (metric === "noise") return sensorKind === "noise";
+  return true;
+}
+
+function clusterOptionsFromRows() {
+  const clusters = new Map();
+  state.rows.forEach((row) => {
+    if (!row.cluster || !metricHasValue(row)) return;
+    if (!clusters.has(row.cluster)) {
+      clusters.set(row.cluster, {
+        kind: "cluster",
+        group: "Predefined sensor groups",
+        id: row.cluster,
+        filterId: row.cluster,
+        value: locationValue("cluster", row.cluster),
+        label: row.cluster,
+        display: row.cluster,
+      });
+    }
+  });
+  return Array.from(clusters.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+function sensorOptionsFromRows() {
+  const sensors = new Map();
+  state.rows.forEach((row) => {
+    if (!row.sensorId || !metricHasValue(row)) return;
+    const id = row.sensorId;
+    if (!sensors.has(id)) {
+      sensors.set(id, {
+        kind: "sensor",
+        group: "Predefined sensor groups",
+        id,
+        filterId: id,
+        value: locationValue("sensor", id),
+        label: row.cluster ? `${row.cluster} - ${id}` : id,
+        display: row.cluster ? `${row.cluster} (${id})` : id,
+      });
+    }
+  });
+  return Array.from(sensors.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+function sensorOptionsFromCatalog() {
+  const uploadedSensorIds = new Set(sensorOptionsFromRows().map((sensor) => sensor.filterId));
+  return state.sensorCatalog
+    .filter((sensor) => catalogSensorMatchesMetric(sensor))
+    .filter((sensor) => !uploadedSensorIds.has(sensor.filterId))
+    .map((sensor) => ({
+      kind: "sensor",
+      group: sensor.group,
+      id: sensor.id,
+      filterId: sensor.filterId,
+      value: locationValue("sensor", sensor.id),
+      label: sensor.name ? `${sensor.name} - ${sensor.displayId}` : sensor.displayId,
+      display: sensor.name ? `${sensor.name} (${sensor.displayId})` : sensor.displayId,
+    }))
+    .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+function locationOptions() {
+  return [...sensorOptionsFromCatalog(), ...clusterOptionsFromRows(), ...sensorOptionsFromRows()];
+}
+
+function comparisonLocationOptions() {
+  return locationOptions();
+}
+
+function locationValue(kind, id) {
+  return `${kind}:${encodeURIComponent(id)}`;
+}
+
+function selectedLocation(value = els.location.value, options = locationOptions()) {
+  const selected = options.find((option) => option.value === value);
+  if (selected) return selected;
+  return {
+    kind: "cluster",
+    id: value,
+    filterId: value,
+    value: locationValue("cluster", value),
+    label: value,
+    display: value,
+  };
+}
+
+function locationDisplay(value = els.location.value) {
+  const location = selectedLocation(value, comparisonLocationOptions());
+  return location.display || location.label || "Sensor Site";
+}
+
+function rowMatchesLocation(row, selection) {
+  if (selection.kind === "sensor") {
+    return row.sensorId && row.sensorId === selection.filterId;
+  }
+  return row.cluster === selection.filterId;
+}
+
+function resolvePreferredLocation(preferredLocation, options) {
+  if (options.some((option) => option.value === preferredLocation)) return preferredLocation;
+  const legacyMatch = options.find((option) => option.id === preferredLocation || option.filterId === preferredLocation || option.label === preferredLocation);
+  return legacyMatch?.value || options[0]?.value || "";
+}
+
+function updateClusterOptions(preferredCluster = els.location.value) {
+  const clusters = clusterOptions();
+  const options = locationOptions();
+  populateClusterSelect(els.location, options);
+
+  const selectedValue = resolvePreferredLocation(preferredCluster, options);
+  if (!selectedValue) return;
+  els.location.value = selectedValue;
+  els.previewCluster.textContent = locationDisplay(selectedValue);
+  const selected = selectedLocation(selectedValue);
+  updateComparisonLocationOptions(clusters, selected.kind === "cluster" ? selected.filterId : clusters[0]);
+  if (els.sensorSearch.value.trim()) renderSensorSearchResults();
+  if (els.comparisonSearch?.value.trim()) renderComparisonSearchResults();
+}
+
+function populateClusterSelect(select, options) {
   select.innerHTML = "";
-  clusters.forEach((cluster) => {
+  const groups = new Map();
+  options.forEach((locationOption) => {
+    if (!groups.has(locationOption.group)) {
+      const group = document.createElement("optgroup");
+      group.label = locationOption.group;
+      groups.set(locationOption.group, group);
+      select.append(group);
+    }
+    const group = groups.get(locationOption.group);
     const option = document.createElement("option");
-    option.value = cluster;
-    option.textContent = cluster;
-    select.append(option);
+    option.value = locationOption.value;
+    option.textContent = locationOption.label;
+    group.append(option);
   });
 }
 
-function updateComparisonLocationOptions(clusters, primaryCluster = els.location.value) {
-  const previous = state.comparisonLocations.filter((cluster) => clusters.includes(cluster));
-  const defaults = [primaryCluster, ...clusters].filter((cluster, index, all) => cluster && all.indexOf(cluster) === index).slice(0, Math.min(4, clusters.length));
-  state.comparisonLocations = previous.length ? previous : defaults;
-  renderComparisonLocationOptions(clusters);
+function matchingLocationOptions(query) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+  return Array.from(els.location.options).filter((option) => {
+    return option.textContent.toLowerCase().includes(normalizedQuery) || option.value.toLowerCase().includes(normalizedQuery);
+  });
 }
 
-function renderComparisonLocationOptions(clusters = clusterOptions()) {
+function hideSensorSearchResults() {
+  els.sensorSearchResults.hidden = true;
+}
+
+function selectLocationSearchResult(value, label = "") {
+  els.location.value = value;
+  els.sensorSearch.value = label;
+  hideSensorSearchResults();
+  render();
+}
+
+function renderSensorSearchResults({ force = false } = {}) {
+  const query = els.sensorSearch.value.trim().toLowerCase();
+  if (!query && !force) {
+    hideSensorSearchResults();
+    return [];
+  }
+
+  const matches = query ? matchingLocationOptions(query).slice(0, 8) : Array.from(els.location.options).slice(0, 8);
+  els.sensorSearchResults.innerHTML = "";
+
+  if (!matches.length) {
+    const empty = document.createElement("span");
+    empty.className = "sensor-search-empty";
+    empty.textContent = "No matching sensors";
+    els.sensorSearchResults.append(empty);
+    els.sensorSearchResults.hidden = false;
+    return [];
+  }
+
+  matches.forEach((option) => {
+    const result = document.createElement("button");
+    result.type = "button";
+    result.className = "sensor-search-result";
+    result.setAttribute("role", "option");
+    result.dataset.value = option.value;
+    result.textContent = option.textContent;
+    result.addEventListener("click", () => selectLocationSearchResult(option.value, option.textContent));
+    els.sensorSearchResults.append(result);
+  });
+
+  els.sensorSearchResults.hidden = false;
+  return matches;
+}
+
+function searchLocationOptions() {
+  const query = els.sensorSearch.value.trim();
+  if (!query) {
+    renderSensorSearchResults({ force: true });
+    els.sensorSearch.focus();
+    return;
+  }
+
+  const match = renderSensorSearchResults()[0];
+
+  if (!match) {
+    els.sensorSearch.setCustomValidity("No matching sensor found");
+    els.sensorSearch.reportValidity();
+    els.sensorSearch.setCustomValidity("");
+    return;
+  }
+
+  selectLocationSearchResult(match.value, match.textContent);
+}
+
+function matchingComparisonOptions(query) {
+  const normalizedQuery = query.trim().toLowerCase();
+  const selected = new Set(state.comparisonLocations);
+  return comparisonLocationOptions().filter((option) => {
+    if (selected.has(option.value)) return false;
+    const searchable = `${option.label} ${option.display} ${option.value}`.toLowerCase();
+    return !normalizedQuery || searchable.includes(normalizedQuery);
+  });
+}
+
+function hideComparisonSearchResults() {
+  els.comparisonSearchResults.hidden = true;
+}
+
+function addComparisonLocation(value) {
+  if (!state.comparisonLocations.includes(value)) {
+    state.comparisonLocations = [...state.comparisonLocations, value].slice(-8);
+  }
+  els.comparisonSearch.value = "";
+  hideComparisonSearchResults();
+  renderComparisonSelected();
+  render();
+}
+
+function renderComparisonSearchResults({ force = false } = {}) {
+  const query = els.comparisonSearch.value.trim();
+  if (!query && !force) {
+    hideComparisonSearchResults();
+    return [];
+  }
+
+  const matches = matchingComparisonOptions(query).slice(0, 8);
+  els.comparisonSearchResults.innerHTML = "";
+
+  if (!matches.length) {
+    const empty = document.createElement("span");
+    empty.className = "sensor-search-empty";
+    empty.textContent = "No matching sensors or groups";
+    els.comparisonSearchResults.append(empty);
+    els.comparisonSearchResults.hidden = false;
+    return [];
+  }
+
+  matches.forEach((option) => {
+    const result = document.createElement("button");
+    result.type = "button";
+    result.className = "sensor-search-result";
+    result.setAttribute("role", "option");
+    result.dataset.value = option.value;
+    result.textContent = option.label;
+    result.addEventListener("click", () => addComparisonLocation(option.value));
+    els.comparisonSearchResults.append(result);
+  });
+
+  els.comparisonSearchResults.hidden = false;
+  return matches;
+}
+
+function addFirstComparisonSearchResult() {
+  const match = renderComparisonSearchResults({ force: true })[0];
+  if (match) addComparisonLocation(match.value);
+}
+
+function updateComparisonLocationOptions(clusters, primaryCluster = els.location.value) {
+  const options = comparisonLocationOptions();
+  const optionValues = new Set(options.map((option) => option.value));
+  const previous = state.comparisonLocations
+    .map((location) => resolvePreferredLocation(location, options))
+    .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
+  const primaryValue = resolvePreferredLocation(primaryCluster, options);
+  const defaults = [primaryValue, ...options.map((option) => option.value)]
+    .filter((location, index, all) => location && all.indexOf(location) === index)
+    .slice(0, Math.min(4, options.length));
+  state.comparisonLocations = previous.length ? previous : defaults;
+  renderComparisonLocationOptions();
+}
+
+function renderComparisonLocationOptions() {
   els.comparisonLocations.innerHTML = "";
-  clusters.forEach((cluster) => {
-    const label = document.createElement("label");
-    label.className = "check-item";
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = cluster;
-    input.checked = state.comparisonLocations.includes(cluster);
-    input.addEventListener("change", () => {
-      const selected = Array.from(els.comparisonLocations.querySelectorAll("input:checked")).map((item) => item.value);
-      state.comparisonLocations = selected.length ? selected : [cluster];
-      if (!selected.length) input.checked = true;
+  renderComparisonSelected();
+}
+
+function comparisonOption(value) {
+  return selectedLocation(value, comparisonLocationOptions());
+}
+
+function renderComparisonSelected() {
+  if (!els.comparisonSelected) return;
+  els.comparisonSelected.innerHTML = "";
+  selectedComparisonLocations().forEach((locationValueToRender) => {
+    const option = comparisonOption(locationValueToRender);
+    const chip = document.createElement("span");
+    chip.className = "comparison-chip";
+    const label = document.createElement("span");
+    label.textContent = option.display || option.label;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${option.display || option.label}`);
+    remove.textContent = "x";
+    remove.addEventListener("click", () => {
+      state.comparisonLocations = state.comparisonLocations.filter((location) => location !== locationValueToRender);
+      if (!state.comparisonLocations.length) {
+        state.comparisonLocations = comparisonLocationOptions().slice(0, 1).map((item) => item.value);
+      }
+      renderComparisonSelected();
       render();
     });
-    label.append(input, document.createTextNode(cluster));
-    els.comparisonLocations.append(label);
+    chip.append(label, remove);
+    els.comparisonSelected.append(chip);
   });
 }
 
 function selectedComparisonLocations() {
-  const clusters = clusterOptions();
-  const selected = state.comparisonLocations.filter((cluster) => clusters.includes(cluster));
+  const options = comparisonLocationOptions();
+  const optionValues = new Set(options.map((option) => option.value));
+  const selected = state.comparisonLocations
+    .map((location) => resolvePreferredLocation(location, options))
+    .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
   if (selected.length) return selected;
-  return clusters.slice(0, Math.min(4, clusters.length));
+  return options.slice(0, Math.min(4, options.length)).map((option) => option.value);
 }
 
 function comparisonSeries() {
   const metric = els.calendarMetric.value;
-  return selectedComparisonLocations().map((cluster, index) => {
-    const rows = monthRowsForCluster(cluster);
+  return selectedComparisonLocations().map((locationValueToRead, index) => {
+    const option = comparisonOption(locationValueToRead);
+    const rows = monthRowsForLocation(locationValueToRead);
     const values = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
     const peak = values.length ? Math.max(...values.map((row) => row[metric])) : null;
     const average = values.length ? roundNumber(values.reduce((sum, row) => sum + row[metric], 0) / values.length) : null;
     return {
-      cluster,
+      key: locationValueToRead,
+      cluster: option.display || option.label,
       rows,
       values,
       peak,
@@ -1078,9 +1608,11 @@ function updateText() {
   const info = monthInfo();
   const stats = exceedanceStats();
   const title = els.title.value.trim() || "Composite Calendar";
-  const location = els.location.value || "Sensor Site";
+  const location = locationDisplay() || "Sensor Site";
   const comparedLocations = selectedComparisonLocations();
-  const comparedLocationText = comparedLocations.length > 1 ? `${comparedLocations.length} locations` : (comparedLocations[0] || location);
+  const comparedLocationText = comparedLocations.length > 1
+    ? `${comparedLocations.length} locations`
+    : (comparedLocations[0] ? locationDisplay(comparedLocations[0]) : location);
   const catchphrase = els.catchphrase.value.trim() || `What's going on in ${location}?`;
   const author = els.author.value.trim() || "Name";
   const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
@@ -1095,7 +1627,6 @@ function updateText() {
   document.getElementById("calendarMonth").textContent = info.long;
   document.getElementById("trendMonth").textContent = info.long;
   els.previewCluster.textContent = location;
-  document.getElementById("trendLocationList").textContent = comparedLocations.join(", ") || "No locations selected";
   const userNote = els.generalInfo.value.trim();
   const noteHtml = state.noteHtml || escapeHtml(userNote || "Type in your comments/stories/lived experience here");
   if (document.activeElement !== els.notePreview) {
@@ -1133,7 +1664,7 @@ function updateText() {
   const total = stats.counts.air + stats.counts.heat + stats.counts.noise;
   document.getElementById("recommendationText").textContent = total
     ? `${info.short} shows ${total} combined threshold exceedances based on daily averages for ${location}. Compare clustered days against site activity, weather, and nearby sources before assigning cause.`
-    : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another cluster, or upload site data to refine the interpretation.`;
+    : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another sensor or cluster, or upload site data to refine the interpretation.`;
 }
 
 function render() {
@@ -1207,7 +1738,10 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 
 ["input", "change"].forEach((eventName) => {
   [els.title, els.author, els.reportDate, els.catchphrase, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
-    input.addEventListener(eventName, render);
+    input.addEventListener(eventName, () => {
+      if (input === els.calendarMetric && eventName === "change") updateClusterOptions(els.location.value);
+      render();
+    });
   });
 });
 
@@ -1230,6 +1764,43 @@ setupNoteEditor({
 els.trendChart.addEventListener("pointermove", updateTrendTooltip);
 els.trendChart.addEventListener("pointerleave", hideTrendTooltip);
 els.trendChart.addEventListener("pointerdown", updateTrendTooltip);
+
+els.sensorSearchBtn.addEventListener("click", () => {
+  renderSensorSearchResults({ force: true });
+  els.sensorSearch.focus();
+});
+els.sensorSearch.addEventListener("input", () => renderSensorSearchResults());
+els.sensorSearch.addEventListener("focus", () => {
+  if (els.sensorSearch.value.trim()) renderSensorSearchResults();
+});
+els.sensorSearch.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideSensorSearchResults();
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  searchLocationOptions();
+});
+els.location.addEventListener("change", hideSensorSearchResults);
+
+els.comparisonSearchBtn.addEventListener("click", () => {
+  renderComparisonSearchResults({ force: true });
+  els.comparisonSearch.focus();
+});
+els.comparisonSearch.addEventListener("input", () => renderComparisonSearchResults());
+els.comparisonSearch.addEventListener("focus", () => {
+  if (els.comparisonSearch.value.trim()) renderComparisonSearchResults();
+});
+els.comparisonSearch.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideComparisonSearchResults();
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  addFirstComparisonSearchResult();
+});
 
 els.pictureSelect.addEventListener("change", () => {
   state.imageChoice = els.pictureSelect.value;
@@ -1276,7 +1847,12 @@ document.getElementById("loadSampleBtn")?.addEventListener("click", () => {
 document.getElementById("printBtn").addEventListener("click", () => window.print());
 
 state.rows = sampleRows;
+state.sensorCatalog = builtInSensorCatalog;
 preloadPictureAssets();
 updateClusterOptions("Sample Cluster 1");
 setTemplate(state.template);
 render();
+loadSensorCatalog().then(() => {
+  updateClusterOptions(els.location.value);
+  render();
+});

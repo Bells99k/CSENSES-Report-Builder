@@ -206,6 +206,110 @@ textarea {
   padding: 9px 10px;
 }
 
+.sensor-search {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sensor-search input {
+  min-width: 0;
+}
+
+.sensor-search button {
+  min-width: 86px;
+  padding: 0 12px;
+}
+
+.sensor-search-results {
+  grid-column: 1 / -1;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid #aeb8bd;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(24, 27, 31, 0.14);
+}
+
+.sensor-search-result,
+.sensor-search-empty {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-bottom: 1px solid #e1e7ea;
+  border-radius: 0;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.sensor-search-result:hover,
+.sensor-search-result:focus {
+  background: #edf5f3;
+}
+
+.sensor-search-empty {
+  color: var(--muted);
+}
+
+.comparison-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-search {
+  margin-top: 0;
+}
+
+.comparison-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px;
+  border: 1px solid #aeb8bd;
+  border-radius: 6px;
+  background: #fbfcfc;
+}
+
+.comparison-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 28px;
+  border: 1px solid #b9c6c9;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.comparison-chip span {
+  overflow: hidden;
+  max-width: 180px;
+  padding: 5px 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comparison-chip button {
+  min-width: 28px;
+  height: 28px;
+  border: 0;
+  border-left: 1px solid #d5dddf;
+  border-radius: 0;
+  padding: 0;
+  background: #f3f6f6;
+  color: var(--ink);
+}
+
 textarea {
   resize: vertical;
 }
@@ -1059,8 +1163,15 @@ th {
 
 @media print {
   @page {
-    size: letter portrait;
-    margin: 0.35in;
+    size: A4 portrait;
+    margin: 6mm;
+  }
+
+  html,
+  body {
+    width: 210mm;
+    height: 297mm;
+    overflow: visible;
   }
 
   body {
@@ -1084,31 +1195,39 @@ th {
   }
 
   .report-page {
-    width: 100%;
+    width: 198mm;
     max-width: none;
-    min-height: auto;
+    min-height: 0;
+    height: 285mm;
     border: 0;
     box-shadow: none;
-    padding-top: 0.08in;
-    zoom: 0.9;
-    page-break-after: always;
+    padding: 0;
+    overflow: hidden;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .template {
+    height: 100%;
+    overflow: hidden;
+    break-inside: avoid;
   }
 
   .report-header {
-    margin-bottom: 0.08in;
+    margin-bottom: 0.05in;
   }
 
   .report-masthead {
     grid-template-columns: 1.05in minmax(0, 1fr) 0.9in;
-    margin-bottom: 0.06in;
+    margin-bottom: 0.04in;
   }
 
   .report-kicker {
-    font-size: 12pt;
+    font-size: 11pt;
   }
 
   .report-logo {
-    width: 1.05in;
+    width: 1in;
   }
 
   .template-label,
@@ -1118,26 +1237,26 @@ th {
 
   .report-hero-block {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) 2.25in;
-    gap: 0.18in;
-    margin-bottom: 0.12in;
-    padding-bottom: 0.1in;
+    gap: 0.14in;
+    margin-bottom: 0.08in;
+    padding-bottom: 0.07in;
   }
 
   .report-catchphrase-column h3 {
-    font-size: 17pt;
+    font-size: 15pt;
   }
 
   .report-photo-title h3 {
-    font-size: 20pt;
+    font-size: 17pt;
   }
 
   .report-meta {
-    margin-top: 0.1in;
-    font-size: 8pt;
+    margin-top: 0.06in;
+    font-size: 7.4pt;
   }
 
   .report-image-panel {
-    height: 0.9in;
+    height: 0.86in;
   }
 
   .panel {
@@ -1149,11 +1268,11 @@ th {
   }
 
   .calendar-panel {
-    padding: 0.1in;
+    padding: 0.075in;
   }
 
   .chart-panel {
-    padding: 0.1in;
+    padding: 0.075in;
   }
 
   .calendar-heading {
@@ -1233,7 +1352,7 @@ th {
   }
 
   #trendChart {
-    height: 2.9in;
+    height: 2.85in;
   }
 
   .calendar-grid {
@@ -1288,13 +1407,13 @@ th {
   }
 
   .summary-grid {
-    margin-top: 0.1in;
-    gap: 0.12in;
+    margin-top: 0.07in;
+    gap: 0.08in;
   }
 
   .summary-card {
-    min-height: 0.58in;
-    padding: 0.06in;
+    min-height: 0.46in;
+    padding: 0.045in;
   }
 
   .summary-card p {
@@ -1307,16 +1426,16 @@ th {
   }
 
   .info-panel {
-    min-height: 3.12in;
+    min-height: 2.95in;
     height: auto;
-    margin-top: 0.08in;
-    padding: 0.09in;
+    margin-top: 0.06in;
+    padding: 0.07in;
   }
 
   .report-note-input {
     min-height: 0;
     max-height: none;
-    height: 2.9in;
+    height: 2.68in;
     overflow: hidden;
     line-height: 1.12;
   }
