@@ -195,6 +195,10 @@ label {
   padding: 0;
 }
 
+.export-option {
+  margin-top: 14px;
+}
+
 input,
 select,
 textarea {
@@ -265,6 +269,19 @@ textarea {
 
 .comparison-search {
   margin-top: 0;
+}
+
+.data-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.data-actions button {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.84rem;
 }
 
 .comparison-selected {
@@ -364,6 +381,159 @@ textarea {
   border: 3px solid var(--line);
   box-shadow: var(--shadow);
   padding: clamp(24px, 4vw, 64px);
+}
+
+.map-page {
+  display: grid;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.map-page[hidden] {
+  display: none;
+}
+
+.map-page-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #c8d0d3;
+}
+
+.map-page-heading h2 {
+  margin-top: 6px;
+  font-size: clamp(1.8rem, 3.6vw, 3rem);
+  line-height: 1;
+}
+
+.sensor-map-panel {
+  position: relative;
+  padding: 18px;
+}
+
+.sensor-map {
+  display: none;
+  width: 100%;
+  height: 580px;
+  overflow: hidden;
+  background: #f8faf8;
+}
+
+.sensor-print-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #eef1ed;
+}
+
+.sensor-map-label {
+  border: 1px solid rgba(24, 27, 31, 0.24);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.sensor-map-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.map-page-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  gap: 10px;
+  color: var(--ink);
+
+.map-legend .map-swatch {
+  width: 15px;
+  height: 15px;
+}
+
+.map-legend .map-swatch-heat {
+  width: 17px;
+  height: 17px;
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+.map-legend i.map-swatch-air {
+  width: 17px;
+  height: 17px;
+  display: inline-block;
+  border-radius: 0 !important;
+  -webkit-clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+.map-legend .map-swatch-highlighted {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.map-legend .map-swatch-svg {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.map-legend i {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+}
+
+.map-selection-list {
+  padding: 16px;
+}
+
+.map-selection-list h3 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+.map-selection-list ul {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.25;
 }
 
 .template {
@@ -1170,7 +1340,8 @@ th {
   html,
   body {
     width: 210mm;
-    height: 297mm;
+    min-height: 297mm;
+    height: auto;
     overflow: visible;
   }
 
@@ -1205,6 +1376,27 @@ th {
     overflow: hidden;
     page-break-after: avoid;
     break-after: avoid;
+  }
+
+  .map-page {
+    display: grid;
+    grid-template-rows: auto auto auto auto;
+    gap: 0.1in;
+    width: 198mm;
+    height: 285mm;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    page-break-before: always;
+    break-before: page;
+    break-after: avoid;
+    overflow: hidden;
+  }
+
+  .map-page[hidden] {
+    display: none !important;
   }
 
   .template {
@@ -1448,4 +1640,62 @@ th {
     appearance: none;
     border-color: transparent;
   }
+
+  .map-page-heading {
+    gap: 0.12in;
+    padding-bottom: 0.07in;
+  }
+
+  .map-page-heading h2 {
+    font-size: 18pt;
+  }
+
+  .sensor-map-panel {
+    position: relative;
+    align-self: start;
+    min-height: 0;
+    padding: 0.08in;
+    overflow: hidden;
+  }
+
+  .sensor-map {
+    display: none !important;
+  }
+
+  .sensor-print-map {
+    display: block;
+    width: 100%;
+    height: 6.15in;
+    max-height: 6.15in;
+    overflow: hidden;
+    background: #eef1ed;
+  }
+
+  .map-page-footer {
+    grid-template-columns: 1fr 1.25fr;
+    gap: 0.1in;
+    min-height: 0;
+  }
+
+  .map-legend {
+    gap: 0.06in;
+    font-size: 7pt;
+  }
+
+  .map-selection-list {
+    min-height: 0;
+    padding: 0.08in;
+  }
+
+  .map-selection-list h3 {
+    margin-bottom: 0.04in;
+    font-size: 8.2pt;
+  }
+
+  .map-selection-list ul {
+    max-height: 0.92in;
+    gap: 0.025in;
+    font-size: 6.7pt;
+  }
+
 }

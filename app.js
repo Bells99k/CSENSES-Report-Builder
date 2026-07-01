@@ -5,8 +5,11 @@ const state = {
   uploadedImage: null,
   builtInImages: {},
   sensorCatalog: [],
+  dataSource: "sample",
   comparisonLocations: [],
   trendHoverDay: null,
+  sensorPrintMapPromise: Promise.resolve(),
+  sensorPrintMapRenderId: 0,
   noteHtml: "",
 };
 
@@ -15,6 +18,7 @@ const els = {
   author: document.getElementById("reportAuthor"),
   reportDate: document.getElementById("reportDate"),
   catchphrase: document.getElementById("reportCatchphrase"),
+  includeMapPage: document.getElementById("includeMapPage"),
   location: document.getElementById("locationName"),
   month: document.getElementById("reportMonth"),
   generalInfo: document.getElementById("generalInfo"),
@@ -43,6 +47,13 @@ const els = {
   trendTooltip: document.getElementById("trendTooltip"),
   trendScene: document.getElementById("sceneCanvasTrends"),
   snapshotScene: document.getElementById("sceneCanvasSnapshot"),
+  sensorMapPage: document.getElementById("sensorMapPage"),
+  sensorMap: document.getElementById("sensorMap"),
+  sensorMapLegend: document.getElementById("sensorMapLegend"),
+  sensorMapList: document.getElementById("sensorMapList"),
+  sensorMapTitle: document.getElementById("sensorMapTitle"),
+  sensorMapMeta: document.getElementById("sensorMapMeta"),
+  sensorPrintMap: document.getElementById("sensorPrintMap"),
 };
 
 const colors = {
@@ -73,135 +84,134 @@ const pictureAssets = {
 };
 
 const builtInSensorCatalog = [
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01486", "filterId": "MOD-PM-01486", "displayId": "MOD-PM-01486", "name": "Blue Hill Ave @ Fayston St (Removed)"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01487", "filterId": "MOD-PM-01487", "displayId": "MOD-PM-01487", "name": "Blue Hill Ave @ Otisfield St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01488", "filterId": "MOD-PM-01488", "displayId": "MOD-PM-01488", "name": "Blue Hill Ave @ Moreland St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01489", "filterId": "MOD-PM-01489", "displayId": "MOD-PM-01489", "name": "Lewis Place"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01490", "filterId": "MOD-PM-01490", "displayId": "MOD-PM-01490", "name": "Blue Hill Ave @ Intervale St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01492", "filterId": "MOD-PM-01492", "displayId": "MOD-PM-01492", "name": "Blue Hill Ave @ Grove Hall"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01493", "filterId": "MOD-PM-01493", "displayId": "MOD-PM-01493", "name": "Blue Hill Ave @ Dudley Square Plaza"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01494", "filterId": "MOD-PM-01494", "displayId": "MOD-PM-01494", "name": "Blue Hill Ave @ Southwood St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01495", "filterId": "MOD-PM-01495", "displayId": "MOD-PM-01495", "name": "Blue Hill Ave @ Woodcliff St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01491", "filterId": "MOD-PM-01491", "displayId": "MOD-PM-01491", "name": "Horatio Harris Park"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01550", "filterId": "MOD-PM-01550", "displayId": "MOD-PM-01550", "name": "Julian Street"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01549", "filterId": "MOD-PM-01549", "displayId": "MOD-PM-01549", "name": "Kroc Center"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01593", "filterId": "MOD-PM-01593", "displayId": "MOD-PM-01593", "name": "Blue Hill Ave @ Fayston St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01548", "filterId": "MOD-PM-01548", "displayId": "MOD-PM-01548", "name": "Seaver and Walnut"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01592", "filterId": "MOD-PM-01592", "displayId": "MOD-PM-01592", "name": "Trotter Elementary"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01594", "filterId": "MOD-PM-01594", "displayId": "MOD-PM-01594", "name": "Elm Hill Ave and Wenonah St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01595", "filterId": "MOD-PM-01595", "displayId": "MOD-PM-01595", "name": "Humboldt and Seaver"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01596", "filterId": "MOD-PM-01596", "displayId": "MOD-PM-01596", "name": "Forest St and Vine St"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01597", "filterId": "MOD-PM-01597", "displayId": "MOD-PM-01597", "name": "Ruthven and Humboldt"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01598", "filterId": "MOD-PM-01598", "displayId": "MOD-PM-01598", "name": "Ceylon Park"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01599", "filterId": "MOD-PM-01599", "displayId": "MOD-PM-01599", "name": "Elm Hill Park"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01600", "filterId": "MOD-PM-01600", "displayId": "MOD-PM-01600", "name": "Normandy St near Geneva Ave"},
-  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01601", "filterId": "MOD-PM-01601", "displayId": "MOD-PM-01601", "name": "Marshfield St and Batchelder St"},
-  {"group": "Noise Sensors", "id": "noise:1", "filterId": "1", "displayId": "Noise Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park"},
-  {"group": "Noise Sensors", "id": "noise:2", "filterId": "2", "displayId": "Noise Sensor 2", "name": "Blue Hill @ Seaver St"},
-  {"group": "Noise Sensors", "id": "noise:3", "filterId": "3", "displayId": "Noise Sensor 3", "name": "Dudley @ Fcottage"},
-  {"group": "Noise Sensors", "id": "noise:4", "filterId": "4", "displayId": "Noise Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)"},
-  {"group": "Noise Sensors", "id": "noise:5", "filterId": "5", "displayId": "Noise Sensor 5", "name": "George @ Shirley"},
-  {"group": "Noise Sensors", "id": "noise:6", "filterId": "6", "displayId": "Noise Sensor 6", "name": "Waverly @ Warren"},
-  {"group": "Noise Sensors", "id": "noise:7", "filterId": "7", "displayId": "Noise Sensor 7", "name": "Kroc Centre"},
-  {"group": "Noise Sensors", "id": "noise:8", "filterId": "8", "displayId": "Noise Sensor 8", "name": "Magnolia @ Lingard"},
-  {"group": "Noise Sensors", "id": "noise:10", "filterId": "10", "displayId": "Noise Sensor 10", "name": "Magnolia @ Wayland"},
-  {"group": "Noise Sensors", "id": "noise:11", "filterId": "11", "displayId": "Noise Sensor 11", "name": "Hollander st"},
-  {"group": "Noise Sensors", "id": "noise:12", "filterId": "12", "displayId": "Noise Sensor 12", "name": "Blue Hill @ Maywood"},
-  {"group": "Noise Sensors", "id": "noise:13", "filterId": "13", "displayId": "Noise Sensor 13", "name": "Blue Hill @ Quincy"},
-  {"group": "Noise Sensors", "id": "noise:15", "filterId": "15", "displayId": "Noise Sensor 15", "name": "Moreland st @ learning together day care"},
-  {"group": "Noise Sensors", "id": "noise:16", "filterId": "16", "displayId": "Noise Sensor 16", "name": "Warren @ Townsend/Quincy"},
-  {"group": "Noise Sensors", "id": "noise:17", "filterId": "17", "displayId": "Noise Sensor 17", "name": "Sargent st"},
-  {"group": "Noise Sensors", "id": "noise:18", "filterId": "18", "displayId": "Noise Sensor 18", "name": "Elm Hill Ave"},
-  {"group": "Noise Sensors", "id": "noise:19", "filterId": "19", "displayId": "Noise Sensor 19", "name": "Quincy @ Dacia"},
-  {"group": "Noise Sensors", "id": "noise:20", "filterId": "20", "displayId": "Noise Sensor 20", "name": "Schuyler st"},
-  {"group": "Noise Sensors", "id": "noise:21", "filterId": "21", "displayId": "Noise Sensor 21", "name": "Blue Hill @ Columbia Road"},
-  {"group": "Noise Sensors", "id": "noise:22", "filterId": "22", "displayId": "Noise Sensor 22", "name": "Sonoma St"},
-  {"group": "Noise Sensors", "id": "noise:23", "filterId": "23", "displayId": "Noise Sensor 23", "name": "Freedom House Warren St"},
-  {"group": "Noise Sensors", "id": "noise:24", "filterId": "24", "displayId": "Noise Sensor 24", "name": "Samuel W. Mason Elementary"},
-  {"group": "Noise Sensors", "id": "noise:25", "filterId": "25", "displayId": "Noise Sensor 25", "name": "Geneva @ Blue Hill"},
-  {"group": "Noise Sensors", "id": "noise:26", "filterId": "26", "displayId": "Noise Sensor 26", "name": "Franklin Park"},
-  {"group": "Noise Sensors", "id": "noise:27", "filterId": "27", "displayId": "Noise Sensor 27", "name": "Dunreath St"},
-  {"group": "Noise Sensors", "id": "noise:28", "filterId": "28", "displayId": "Noise Sensor 28", "name": "Other Dudley Commons"},
-  {"group": "Noise Sensors", "id": "noise:29", "filterId": "29", "displayId": "Noise Sensor 29", "name": "Langdon St Farm"},
-  {"group": "Noise Sensors", "id": "noise:30", "filterId": "30", "displayId": "Noise Sensor 30", "name": "E. Cottage & Batchelder St"},
-  {"group": "Noise Sensors", "id": "noise:32", "filterId": "32", "displayId": "Noise Sensor 32", "name": "Normandy and Stanwood"},
-  {"group": "Noise Sensors", "id": "noise:33", "filterId": "33", "displayId": "Noise Sensor 33", "name": "Weldon St and Gannet St"},
-  {"group": "Noise Sensors", "id": "noise:34", "filterId": "34", "displayId": "Noise Sensor 34", "name": "Homestead and Harold"},
-  {"group": "Noise Sensors", "id": "noise:35", "filterId": "35", "displayId": "Noise Sensor 35", "name": "Ruthven and Humboldt"},
-  {"group": "Noise Sensors", "id": "noise:36", "filterId": "36", "displayId": "Noise Sensor 36", "name": "Waumbeck and Warren"},
-  {"group": "Noise Sensors", "id": "noise:37", "filterId": "37", "displayId": "Noise Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)"},
-  {"group": "Noise Sensors", "id": "noise:38", "filterId": "38", "displayId": "Noise Sensor 38", "name": "Elm Hill and Crawford"},
-  {"group": "Noise Sensors", "id": "noise:39", "filterId": "39", "displayId": "Noise Sensor 39", "name": "Batchelder and Marshfield"},
-  {"group": "Noise Sensors", "id": "noise:40", "filterId": "40", "displayId": "Noise Sensor 40", "name": "Hampden and Eustis"},
-  {"group": "Noise Sensors", "id": "noise:41", "filterId": "41", "displayId": "Noise Sensor 41", "name": "Forest St and Vine St"},
-  {"group": "Noise Sensors", "id": "noise:43", "filterId": "43", "displayId": "Noise Sensor 43", "name": "W.Cottage and Brook"},
-  {"group": "Noise Sensors", "id": "noise:44", "filterId": "44", "displayId": "Noise Sensor 44", "name": "Washington St and Bishop Joe L. Smith"},
-  {"group": "Noise Sensors", "id": "noise:45", "filterId": "45", "displayId": "Noise Sensor 45", "name": "Children's Park (Intervale and Normandy)"},
-  {"group": "Noise Sensors", "id": "noise:46", "filterId": "46", "displayId": "Noise Sensor 46", "name": "Bynoe Park"},
-  {"group": "Noise Sensors", "id": "noise:47", "filterId": "47", "displayId": "Noise Sensor 47", "name": "Elm Hill and Cheney"},
-  {"group": "Noise Sensors", "id": "noise:48", "filterId": "48", "displayId": "Noise Sensor 48", "name": "Quincy and Magnolia"},
-  {"group": "Noise Sensors", "id": "noise:49", "filterId": "49", "displayId": "Noise Sensor 49", "name": "Moreland St, Howes Playground"},
-  {"group": "Noise Sensors", "id": "noise:50", "filterId": "50", "displayId": "Noise Sensor 50", "name": "Warren Pl"},
-  {"group": "Noise Sensors", "id": "noise:51", "filterId": "51", "displayId": "Noise Sensor 51", "name": "Normandy and Seaver"},
-  {"group": "Noise Sensors", "id": "noise:52", "filterId": "52", "displayId": "Noise Sensor 52", "name": "Winthrop Playground"},
-  {"group": "Noise Sensors", "id": "noise:53", "filterId": "53", "displayId": "Noise Sensor 53", "name": "Dennis St Park"},
-  {"group": "Noise Sensors", "id": "noise:54", "filterId": "54", "displayId": "Noise Sensor 54", "name": "Freedom House Warren St"},
-  {"group": "Noise Sensors", "id": "noise:55", "filterId": "55", "displayId": "Noise Sensor 55", "name": "Fayston and Perth"},
-  {"group": "Noise Sensors", "id": "noise:9", "filterId": "9", "displayId": "Noise Sensor 9", "name": "Savin & Tupelo"},
-  {"group": "Heat Sensors", "id": "heat:1", "filterId": "1", "displayId": "Heat Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park"},
-  {"group": "Heat Sensors", "id": "heat:2", "filterId": "2", "displayId": "Heat Sensor 2", "name": "Blue Hill @ Seaver St"},
-  {"group": "Heat Sensors", "id": "heat:3", "filterId": "3", "displayId": "Heat Sensor 3", "name": "Dudley @ Fcottage"},
-  {"group": "Heat Sensors", "id": "heat:4", "filterId": "4", "displayId": "Heat Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)"},
-  {"group": "Heat Sensors", "id": "heat:5", "filterId": "5", "displayId": "Heat Sensor 5", "name": "George @ Shirley"},
-  {"group": "Heat Sensors", "id": "heat:6", "filterId": "6", "displayId": "Heat Sensor 6", "name": "Waverly @ Warren"},
-  {"group": "Heat Sensors", "id": "heat:7", "filterId": "7", "displayId": "Heat Sensor 7", "name": "Kroc Centre"},
-  {"group": "Heat Sensors", "id": "heat:8", "filterId": "8", "displayId": "Heat Sensor 8", "name": "Magnolia @ Lingard"},
-  {"group": "Heat Sensors", "id": "heat:10", "filterId": "10", "displayId": "Heat Sensor 10", "name": "Magnolia @ Wayland"},
-  {"group": "Heat Sensors", "id": "heat:11", "filterId": "11", "displayId": "Heat Sensor 11", "name": "Hollander st"},
-  {"group": "Heat Sensors", "id": "heat:12", "filterId": "12", "displayId": "Heat Sensor 12", "name": "Blue Hill @ Maywood"},
-  {"group": "Heat Sensors", "id": "heat:13", "filterId": "13", "displayId": "Heat Sensor 13", "name": "Blue Hill @ Quincy"},
-  {"group": "Heat Sensors", "id": "heat:15", "filterId": "15", "displayId": "Heat Sensor 15", "name": "Moreland st @ learning together day care"},
-  {"group": "Heat Sensors", "id": "heat:16", "filterId": "16", "displayId": "Heat Sensor 16", "name": "Warren @ Townsend/Quincy"},
-  {"group": "Heat Sensors", "id": "heat:17", "filterId": "17", "displayId": "Heat Sensor 17", "name": "Sargent st"},
-  {"group": "Heat Sensors", "id": "heat:18", "filterId": "18", "displayId": "Heat Sensor 18", "name": "Elm Hill Ave"},
-  {"group": "Heat Sensors", "id": "heat:19", "filterId": "19", "displayId": "Heat Sensor 19", "name": "Quincy @ Dacia"},
-  {"group": "Heat Sensors", "id": "heat:20", "filterId": "20", "displayId": "Heat Sensor 20", "name": "Schuyler st"},
-  {"group": "Heat Sensors", "id": "heat:21", "filterId": "21", "displayId": "Heat Sensor 21", "name": "Blue Hill @ Columbia Road"},
-  {"group": "Heat Sensors", "id": "heat:22", "filterId": "22", "displayId": "Heat Sensor 22", "name": "Sonoma St"},
-  {"group": "Heat Sensors", "id": "heat:23", "filterId": "23", "displayId": "Heat Sensor 23", "name": "Freedom House Warren St"},
-  {"group": "Heat Sensors", "id": "heat:24", "filterId": "24", "displayId": "Heat Sensor 24", "name": "Samuel W. Mason Elementary"},
-  {"group": "Heat Sensors", "id": "heat:25", "filterId": "25", "displayId": "Heat Sensor 25", "name": "Geneva @ Blue Hill"},
-  {"group": "Heat Sensors", "id": "heat:26", "filterId": "26", "displayId": "Heat Sensor 26", "name": "Franklin Park"},
-  {"group": "Heat Sensors", "id": "heat:27", "filterId": "27", "displayId": "Heat Sensor 27", "name": "Dunreath St"},
-  {"group": "Heat Sensors", "id": "heat:28", "filterId": "28", "displayId": "Heat Sensor 28", "name": "Other Dudley Commons"},
-  {"group": "Heat Sensors", "id": "heat:29", "filterId": "29", "displayId": "Heat Sensor 29", "name": "Langdon St Farm"},
-  {"group": "Heat Sensors", "id": "heat:30", "filterId": "30", "displayId": "Heat Sensor 30", "name": "E. Cottage & Batchelder St"},
-  {"group": "Heat Sensors", "id": "heat:32", "filterId": "32", "displayId": "Heat Sensor 32", "name": "Normandy and Stanwood"},
-  {"group": "Heat Sensors", "id": "heat:33", "filterId": "33", "displayId": "Heat Sensor 33", "name": "Weldon St and Gannet St"},
-  {"group": "Heat Sensors", "id": "heat:34", "filterId": "34", "displayId": "Heat Sensor 34", "name": "Homestead and Harold"},
-  {"group": "Heat Sensors", "id": "heat:35", "filterId": "35", "displayId": "Heat Sensor 35", "name": "Ruthven and Humboldt"},
-  {"group": "Heat Sensors", "id": "heat:36", "filterId": "36", "displayId": "Heat Sensor 36", "name": "Waumbeck and Warren"},
-  {"group": "Heat Sensors", "id": "heat:37", "filterId": "37", "displayId": "Heat Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)"},
-  {"group": "Heat Sensors", "id": "heat:38", "filterId": "38", "displayId": "Heat Sensor 38", "name": "Elm Hill and Crawford"},
-  {"group": "Heat Sensors", "id": "heat:39", "filterId": "39", "displayId": "Heat Sensor 39", "name": "Batchelder and Marshfield"},
-  {"group": "Heat Sensors", "id": "heat:40", "filterId": "40", "displayId": "Heat Sensor 40", "name": "Hampden and Eustis"},
-  {"group": "Heat Sensors", "id": "heat:41", "filterId": "41", "displayId": "Heat Sensor 41", "name": "Forest St and Vine St"},
-  {"group": "Heat Sensors", "id": "heat:43", "filterId": "43", "displayId": "Heat Sensor 43", "name": "W.Cottage and Brook"},
-  {"group": "Heat Sensors", "id": "heat:44", "filterId": "44", "displayId": "Heat Sensor 44", "name": "Washington St and Bishop Joe L. Smith"},
-  {"group": "Heat Sensors", "id": "heat:45", "filterId": "45", "displayId": "Heat Sensor 45", "name": "Children's Park (Intervale and Normandy)"},
-  {"group": "Heat Sensors", "id": "heat:46", "filterId": "46", "displayId": "Heat Sensor 46", "name": "Bynoe Park"},
-  {"group": "Heat Sensors", "id": "heat:47", "filterId": "47", "displayId": "Heat Sensor 47", "name": "Elm Hill and Cheney"},
-  {"group": "Heat Sensors", "id": "heat:48", "filterId": "48", "displayId": "Heat Sensor 48", "name": "Quincy and Magnolia"},
-  {"group": "Heat Sensors", "id": "heat:49", "filterId": "49", "displayId": "Heat Sensor 49", "name": "Moreland St, Howes Playground"},
-  {"group": "Heat Sensors", "id": "heat:50", "filterId": "50", "displayId": "Heat Sensor 50", "name": "Warren Pl"},
-  {"group": "Heat Sensors", "id": "heat:51", "filterId": "51", "displayId": "Heat Sensor 51", "name": "Normandy and Seaver"},
-  {"group": "Heat Sensors", "id": "heat:52", "filterId": "52", "displayId": "Heat Sensor 52", "name": "Winthrop Playground"},
-  {"group": "Heat Sensors", "id": "heat:53", "filterId": "53", "displayId": "Heat Sensor 53", "name": "Dennis St Park"},
-  {"group": "Heat Sensors", "id": "heat:54", "filterId": "54", "displayId": "Heat Sensor 54", "name": "Freedom House Warren St"},
-  {"group": "Heat Sensors", "id": "heat:55", "filterId": "55", "displayId": "Heat Sensor 55", "name": "Fayston and Perth"},
-  {"group": "Heat Sensors", "id": "heat:9", "filterId": "9", "displayId": "Heat Sensor 9", "name": "Savin & Tupelo"},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01486", "filterId": "MOD-PM-01486", "displayId": "MOD-PM-01486", "name": "Blue Hill Ave @ Fayston St (Removed)", "latitude": 42.31422, "longitude": -71.07889},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01487", "filterId": "MOD-PM-01487", "displayId": "MOD-PM-01487", "name": "Blue Hill Ave @ Otisfield St", "latitude": 42.3126, "longitude": -71.0802},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01488", "filterId": "MOD-PM-01488", "displayId": "MOD-PM-01488", "name": "Blue Hill Ave @ Moreland St", "latitude": 42.32266, "longitude": -71.0769},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01489", "filterId": "MOD-PM-01489", "displayId": "MOD-PM-01489", "name": "Lewis Place", "latitude": 42.3237797, "longitude": -71.074761},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01490", "filterId": "MOD-PM-01490", "displayId": "MOD-PM-01490", "name": "Blue Hill Ave @ Intervale St", "latitude": 42.311667, "longitude": -71.080981},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01492", "filterId": "MOD-PM-01492", "displayId": "MOD-PM-01492", "name": "Blue Hill Ave @ Grove Hall", "latitude": 42.30876, "longitude": -71.08304},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01493", "filterId": "MOD-PM-01493", "displayId": "MOD-PM-01493", "name": "Blue Hill Ave @ Dudley Square Plaza", "latitude": 42.324604, "longitude": -71.075412},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01494", "filterId": "MOD-PM-01494", "displayId": "MOD-PM-01494", "name": "Blue Hill Ave @ Southwood St", "latitude": 42.31797, "longitude": -71.07797},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01495", "filterId": "MOD-PM-01495", "displayId": "MOD-PM-01495", "name": "Blue Hill Ave @ Woodcliff St", "latitude": 42.31644, "longitude": -71.07824},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01491", "filterId": "MOD-PM-01491", "displayId": "MOD-PM-01491", "name": "Horatio Harris Park", "latitude": 42.318763, "longitude": -71.089615},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01550", "filterId": "MOD-PM-01550", "displayId": "MOD-PM-01550", "name": "Julian Street", "latitude": 42.319504, "longitude": -71.075321},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01549", "filterId": "MOD-PM-01549", "displayId": "MOD-PM-01549", "name": "Kroc Center", "latitude": 42.319041, "longitude": -71.069993},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01593", "filterId": "MOD-PM-01593", "displayId": "MOD-PM-01593", "name": "Blue Hill Ave @ Fayston St", "latitude": 42.31422, "longitude": -71.07889},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01548", "filterId": "MOD-PM-01548", "displayId": "MOD-PM-01548", "name": "Seaver and Walnut", "latitude": 42.3131943, "longitude": -71.0946088},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01592", "filterId": "MOD-PM-01592", "displayId": "MOD-PM-01592", "name": "Trotter Elementary", "latitude": 42.3153953, "longitude": -71.0877955},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01594", "filterId": "MOD-PM-01594", "displayId": "MOD-PM-01594", "name": "Elm Hill Ave and Wenonah St", "latitude": 42.31328138, "longitude": -71.0845827},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01595", "filterId": "MOD-PM-01595", "displayId": "MOD-PM-01595", "name": "Humboldt and Seaver", "latitude": 42.3101841, "longitude": -71.0919846},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01596", "filterId": "MOD-PM-01596", "displayId": "MOD-PM-01596", "name": "Forest St and Vine St", "latitude": 42.326659, "longitude": -71.0774723},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01597", "filterId": "MOD-PM-01597", "displayId": "MOD-PM-01597", "name": "Ruthven and Humboldt", "latitude": 42.3127867, "longitude": -71.0901441},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01598", "filterId": "MOD-PM-01598", "displayId": "MOD-PM-01598", "name": "Ceylon Park", "latitude": 42.3098042, "longitude": -71.0733483},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01599", "filterId": "MOD-PM-01599", "displayId": "MOD-PM-01599", "name": "Elm Hill Park", "latitude": 42.3130327, "longitude": -71.0819107},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01600", "filterId": "MOD-PM-01600", "displayId": "MOD-PM-01600", "name": "Normandy St near Geneva Ave", "latitude": 42.3084003, "longitude": -71.081064},
+  {"group": "Air Quality Sensors", "id": "air:MOD-PM-01601", "filterId": "MOD-PM-01601", "displayId": "MOD-PM-01601", "name": "Marshfield St and Batchelder St", "latitude": 42.3227283, "longitude": -71.0692903},
+  {"group": "Noise Sensors", "id": "noise:1", "filterId": "1", "displayId": "Noise Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park", "latitude": 42.309, "longitude": -71.091},
+  {"group": "Noise Sensors", "id": "noise:2", "filterId": "2", "displayId": "Noise Sensor 2", "name": "Blue Hill @ Seaver St", "latitude": 42.3050352, "longitude": -71.0848431},
+  {"group": "Noise Sensors", "id": "noise:3", "filterId": "3", "displayId": "Noise Sensor 3", "name": "Dudley @ Fcottage", "latitude": 42.3214532, "longitude": -71.0721814},
+  {"group": "Noise Sensors", "id": "noise:4", "filterId": "4", "displayId": "Noise Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)", "latitude": 42.3248193, "longitude": -71.0750074},
+  {"group": "Noise Sensors", "id": "noise:5", "filterId": "5", "displayId": "Noise Sensor 5", "name": "George @ Shirley", "latitude": 42.3238184, "longitude": -71.0711447},
+  {"group": "Noise Sensors", "id": "noise:6", "filterId": "6", "displayId": "Noise Sensor 6", "name": "Waverly @ Warren", "latitude": 42.3214453, "longitude": -71.082034},
+  {"group": "Noise Sensors", "id": "noise:7", "filterId": "7", "displayId": "Noise Sensor 7", "name": "Kroc Centre", "latitude": 42.319003, "longitude": -71.0699431},
+  {"group": "Noise Sensors", "id": "noise:8", "filterId": "8", "displayId": "Noise Sensor 8", "name": "Magnolia @ Lingard", "latitude": 42.3166749, "longitude": -71.0707997},
+  {"group": "Noise Sensors", "id": "noise:10", "filterId": "10", "displayId": "Noise Sensor 10", "name": "Magnolia @ Wayland", "latitude": 42.314058, "longitude": -71.0720164},
+  {"group": "Noise Sensors", "id": "noise:11", "filterId": "11", "displayId": "Noise Sensor 11", "name": "Hollander st", "latitude": 42.3157997, "longitude": -71.0887256},
+  {"group": "Noise Sensors", "id": "noise:12", "filterId": "12", "displayId": "Noise Sensor 12", "name": "Blue Hill @ Maywood", "latitude": 42.316419, "longitude": -71.0781852},
+  {"group": "Noise Sensors", "id": "noise:13", "filterId": "13", "displayId": "Noise Sensor 13", "name": "Blue Hill @ Quincy", "latitude": 42.3141877, "longitude": -71.0789912},
+  {"group": "Noise Sensors", "id": "noise:15", "filterId": "15", "displayId": "Noise Sensor 15", "name": "Moreland st @ learning together day care", "latitude": 42.3255823, "longitude": -71.0817659},
+  {"group": "Noise Sensors", "id": "noise:16", "filterId": "16", "displayId": "Noise Sensor 16", "name": "Warren @ Townsend/Quincy", "latitude": 42.3164061, "longitude": -71.0826839},
+  {"group": "Noise Sensors", "id": "noise:17", "filterId": "17", "displayId": "Noise Sensor 17", "name": "Sargent st", "latitude": 42.3152962, "longitude": -71.073893},
+  {"group": "Noise Sensors", "id": "noise:18", "filterId": "18", "displayId": "Noise Sensor 18", "name": "Elm Hill Ave", "latitude": 42.3082767, "longitude": -71.0886139},
+  {"group": "Noise Sensors", "id": "noise:19", "filterId": "19", "displayId": "Noise Sensor 19", "name": "Quincy @ Dacia", "latitude": 42.3142633, "longitude": -71.0780641},
+  {"group": "Noise Sensors", "id": "noise:20", "filterId": "20", "displayId": "Noise Sensor 20", "name": "Schuyler st", "latitude": 42.3086645, "longitude": -71.0858625},
+  {"group": "Noise Sensors", "id": "noise:21", "filterId": "21", "displayId": "Noise Sensor 21", "name": "Blue Hill @ Columbia Road", "latitude": 42.303987, "longitude": -71.084942},
+  {"group": "Noise Sensors", "id": "noise:22", "filterId": "22", "displayId": "Noise Sensor 22", "name": "Sonoma St", "latitude": 42.308337, "longitude": -71.0870204},
+  {"group": "Noise Sensors", "id": "noise:23", "filterId": "23", "displayId": "Noise Sensor 23", "name": "Freedom House Warren St", "latitude": 42.3108226, "longitude": -71.0832951},
+  {"group": "Noise Sensors", "id": "noise:24", "filterId": "24", "displayId": "Noise Sensor 24", "name": "Samuel W. Mason Elementary", "latitude": 42.3261204, "longitude": -71.0706918},
+  {"group": "Noise Sensors", "id": "noise:25", "filterId": "25", "displayId": "Noise Sensor 25", "name": "Geneva @ Blue Hill", "latitude": 42.3088432, "longitude": -71.0828049},
+  {"group": "Noise Sensors", "id": "noise:26", "filterId": "26", "displayId": "Noise Sensor 26", "name": "Franklin Park", "latitude": 42.3046873, "longitude": -71.0955525},
+  {"group": "Noise Sensors", "id": "noise:27", "filterId": "27", "displayId": "Noise Sensor 27", "name": "Dunreath St", "latitude": 42.3232051, "longitude": -71.0805673},
+  {"group": "Noise Sensors", "id": "noise:28", "filterId": "28", "displayId": "Noise Sensor 28", "name": "Other Dudley Commons", "latitude": 42.3267352, "longitude": -71.0755563},
+  {"group": "Noise Sensors", "id": "noise:29", "filterId": "29", "displayId": "Noise Sensor 29", "name": "Langdon St Farm", "latitude": 42.3243402, "longitude": -71.0723826},
+  {"group": "Noise Sensors", "id": "noise:30", "filterId": "30", "displayId": "Noise Sensor 30", "name": "E. Cottage & Batchelder St", "latitude": 42.32156, "longitude": -71.06928},
+  {"group": "Noise Sensors", "id": "noise:32", "filterId": "32", "displayId": "Noise Sensor 32", "name": "Normandy and Stanwood", "latitude": 42.30926, "longitude": -71.08027},
+  {"group": "Noise Sensors", "id": "noise:33", "filterId": "33", "displayId": "Noise Sensor 33", "name": "Weldon St and Gannet St", "latitude": 42.31487, "longitude": -71.08192},
+  {"group": "Noise Sensors", "id": "noise:34", "filterId": "34", "displayId": "Noise Sensor 34", "name": "Homestead and Harold", "latitude": 42.31285, "longitude": -71.09263},
+  {"group": "Noise Sensors", "id": "noise:35", "filterId": "35", "displayId": "Noise Sensor 35", "name": "Ruthven and Humboldt", "latitude": 42.31267, "longitude": -71.09006},
+  {"group": "Noise Sensors", "id": "noise:36", "filterId": "36", "displayId": "Noise Sensor 36", "name": "Waumbeck and Warren", "latitude": 42.3133, "longitude": -71.0837},
+  {"group": "Noise Sensors", "id": "noise:37", "filterId": "37", "displayId": "Noise Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)", "latitude": 42.31387, "longitude": -71.09082},
+  {"group": "Noise Sensors", "id": "noise:38", "filterId": "38", "displayId": "Noise Sensor 38", "name": "Elm Hill and Crawford", "latitude": 42.311667, "longitude": -71.085833},
+  {"group": "Noise Sensors", "id": "noise:39", "filterId": "39", "displayId": "Noise Sensor 39", "name": "Batchelder and Marshfield", "latitude": 42.322778, "longitude": -71.069167},
+  {"group": "Noise Sensors", "id": "noise:40", "filterId": "40", "displayId": "Noise Sensor 40", "name": "Hampden and Eustis", "latitude": 42.326944, "longitude": -71.075278},
+  {"group": "Noise Sensors", "id": "noise:41", "filterId": "41", "displayId": "Noise Sensor 41", "name": "Forest St and Vine St", "latitude": 42.32667, "longitude": -71.0775},
+  {"group": "Noise Sensors", "id": "noise:43", "filterId": "43", "displayId": "Noise Sensor 43", "name": "W.Cottage and Brook", "latitude": 42.32069, "longitude": -71.07425},
+  {"group": "Noise Sensors", "id": "noise:44", "filterId": "44", "displayId": "Noise Sensor 44", "name": "Washington St and Bishop Joe L. Smith", "latitude": 42.3062, "longitude": -71.08143},
+  {"group": "Noise Sensors", "id": "noise:45", "filterId": "45", "displayId": "Noise Sensor 45", "name": "Children's Park (Intervale and Normandy)", "latitude": 42.31067, "longitude": -71.07822},
+  {"group": "Noise Sensors", "id": "noise:46", "filterId": "46", "displayId": "Noise Sensor 46", "name": "Bynoe Park", "latitude": 42.329, "longitude": -71.076},
+  {"group": "Noise Sensors", "id": "noise:47", "filterId": "47", "displayId": "Noise Sensor 47", "name": "Elm Hill and Cheney", "latitude": 42.31047, "longitude": -71.08691},
+  {"group": "Noise Sensors", "id": "noise:48", "filterId": "48", "displayId": "Noise Sensor 48", "name": "Quincy and Magnolia", "latitude": 42.31227, "longitude": -71.07349},
+  {"group": "Noise Sensors", "id": "noise:49", "filterId": "49", "displayId": "Noise Sensor 49", "name": "Moreland St, Howes Playground", "latitude": 42.32404, "longitude": -71.07928},
+  {"group": "Noise Sensors", "id": "noise:50", "filterId": "50", "displayId": "Noise Sensor 50", "name": "Warren Pl", "latitude": 42.32787, "longitude": -71.082},
+  {"group": "Noise Sensors", "id": "noise:51", "filterId": "51", "displayId": "Noise Sensor 51", "name": "Normandy and Seaver", "latitude": 42.30499, "longitude": -71.08363},
+  {"group": "Noise Sensors", "id": "noise:52", "filterId": "52", "displayId": "Noise Sensor 52", "name": "Winthrop Playground", "latitude": 42.31742, "longitude": -71.07608},
+  {"group": "Noise Sensors", "id": "noise:53", "filterId": "53", "displayId": "Noise Sensor 53", "name": "Dennis St Park", "latitude": 42.32258, "longitude": -71.07489},
+  {"group": "Noise Sensors", "id": "noise:54", "filterId": "54", "displayId": "Noise Sensor 54", "name": "Freedom House Warren St", "latitude": 42.3108226, "longitude": -71.0832951},
+  {"group": "Noise Sensors", "id": "noise:55", "filterId": "55", "displayId": "Noise Sensor 55", "name": "Fayston and Perth", "latitude": 42.31298, "longitude": -71.07653},
+  {"group": "Noise Sensors", "id": "noise:9", "filterId": "9", "displayId": "Noise Sensor 9", "name": "Savin & Tupelo", "latitude": 42.3167, "longitude": -71.08095},
+  {"group": "Heat Sensors", "id": "heat:1", "filterId": "1", "displayId": "Heat Sensor 1", "name": "Seaver st & Tiffany Moore Tot Park", "latitude": 42.309, "longitude": -71.091},
+  {"group": "Heat Sensors", "id": "heat:2", "filterId": "2", "displayId": "Heat Sensor 2", "name": "Blue Hill @ Seaver St", "latitude": 42.3050352, "longitude": -71.0848431},
+  {"group": "Heat Sensors", "id": "heat:3", "filterId": "3", "displayId": "Heat Sensor 3", "name": "Dudley @ Fcottage", "latitude": 42.3214532, "longitude": -71.0721814},
+  {"group": "Heat Sensors", "id": "heat:4", "filterId": "4", "displayId": "Heat Sensor 4", "name": "Dudley @ Blue Hill (Dudley Commons)", "latitude": 42.3248193, "longitude": -71.0750074},
+  {"group": "Heat Sensors", "id": "heat:5", "filterId": "5", "displayId": "Heat Sensor 5", "name": "George @ Shirley", "latitude": 42.3238184, "longitude": -71.0711447},
+  {"group": "Heat Sensors", "id": "heat:6", "filterId": "6", "displayId": "Heat Sensor 6", "name": "Waverly @ Warren", "latitude": 42.3214453, "longitude": -71.082034},
+  {"group": "Heat Sensors", "id": "heat:7", "filterId": "7", "displayId": "Heat Sensor 7", "name": "Kroc Centre", "latitude": 42.319003, "longitude": -71.0699431},
+  {"group": "Heat Sensors", "id": "heat:8", "filterId": "8", "displayId": "Heat Sensor 8", "name": "Magnolia @ Lingard", "latitude": 42.3166749, "longitude": -71.0707997},
+  {"group": "Heat Sensors", "id": "heat:10", "filterId": "10", "displayId": "Heat Sensor 10", "name": "Magnolia @ Wayland", "latitude": 42.314058, "longitude": -71.0720164},
+  {"group": "Heat Sensors", "id": "heat:11", "filterId": "11", "displayId": "Heat Sensor 11", "name": "Hollander st", "latitude": 42.3157997, "longitude": -71.0887256},
+  {"group": "Heat Sensors", "id": "heat:12", "filterId": "12", "displayId": "Heat Sensor 12", "name": "Blue Hill @ Maywood", "latitude": 42.316419, "longitude": -71.0781852},
+  {"group": "Heat Sensors", "id": "heat:13", "filterId": "13", "displayId": "Heat Sensor 13", "name": "Blue Hill @ Quincy", "latitude": 42.3141877, "longitude": -71.0789912},
+  {"group": "Heat Sensors", "id": "heat:15", "filterId": "15", "displayId": "Heat Sensor 15", "name": "Moreland st @ learning together day care", "latitude": 42.3255823, "longitude": -71.0817659},
+  {"group": "Heat Sensors", "id": "heat:16", "filterId": "16", "displayId": "Heat Sensor 16", "name": "Warren @ Townsend/Quincy", "latitude": 42.3164061, "longitude": -71.0826839},
+  {"group": "Heat Sensors", "id": "heat:17", "filterId": "17", "displayId": "Heat Sensor 17", "name": "Sargent st", "latitude": 42.3152962, "longitude": -71.073893},
+  {"group": "Heat Sensors", "id": "heat:18", "filterId": "18", "displayId": "Heat Sensor 18", "name": "Elm Hill Ave", "latitude": 42.3082767, "longitude": -71.0886139},
+  {"group": "Heat Sensors", "id": "heat:19", "filterId": "19", "displayId": "Heat Sensor 19", "name": "Quincy @ Dacia", "latitude": 42.3142633, "longitude": -71.0780641},
+  {"group": "Heat Sensors", "id": "heat:20", "filterId": "20", "displayId": "Heat Sensor 20", "name": "Schuyler st", "latitude": 42.3086645, "longitude": -71.0858625},
+  {"group": "Heat Sensors", "id": "heat:21", "filterId": "21", "displayId": "Heat Sensor 21", "name": "Blue Hill @ Columbia Road", "latitude": 42.303987, "longitude": -71.084942},
+  {"group": "Heat Sensors", "id": "heat:22", "filterId": "22", "displayId": "Heat Sensor 22", "name": "Sonoma St", "latitude": 42.308337, "longitude": -71.0870204},
+  {"group": "Heat Sensors", "id": "heat:23", "filterId": "23", "displayId": "Heat Sensor 23", "name": "Freedom House Warren St", "latitude": 42.3108226, "longitude": -71.0832951},
+  {"group": "Heat Sensors", "id": "heat:24", "filterId": "24", "displayId": "Heat Sensor 24", "name": "Samuel W. Mason Elementary", "latitude": 42.3261204, "longitude": -71.0706918},
+  {"group": "Heat Sensors", "id": "heat:25", "filterId": "25", "displayId": "Heat Sensor 25", "name": "Geneva @ Blue Hill", "latitude": 42.3088432, "longitude": -71.0828049},
+  {"group": "Heat Sensors", "id": "heat:26", "filterId": "26", "displayId": "Heat Sensor 26", "name": "Franklin Park", "latitude": 42.3046873, "longitude": -71.0955525},
+  {"group": "Heat Sensors", "id": "heat:27", "filterId": "27", "displayId": "Heat Sensor 27", "name": "Dunreath St", "latitude": 42.3232051, "longitude": -71.0805673},
+  {"group": "Heat Sensors", "id": "heat:28", "filterId": "28", "displayId": "Heat Sensor 28", "name": "Other Dudley Commons", "latitude": 42.3267352, "longitude": -71.0755563},
+  {"group": "Heat Sensors", "id": "heat:29", "filterId": "29", "displayId": "Heat Sensor 29", "name": "Langdon St Farm", "latitude": 42.3243402, "longitude": -71.0723826},
+  {"group": "Heat Sensors", "id": "heat:30", "filterId": "30", "displayId": "Heat Sensor 30", "name": "E. Cottage & Batchelder St", "latitude": 42.32156, "longitude": -71.06928},
+  {"group": "Heat Sensors", "id": "heat:32", "filterId": "32", "displayId": "Heat Sensor 32", "name": "Normandy and Stanwood", "latitude": 42.30926, "longitude": -71.08027},
+  {"group": "Heat Sensors", "id": "heat:33", "filterId": "33", "displayId": "Heat Sensor 33", "name": "Weldon St and Gannet St", "latitude": 42.31487, "longitude": -71.08192},
+  {"group": "Heat Sensors", "id": "heat:34", "filterId": "34", "displayId": "Heat Sensor 34", "name": "Homestead and Harold", "latitude": 42.31285, "longitude": -71.09263},
+  {"group": "Heat Sensors", "id": "heat:35", "filterId": "35", "displayId": "Heat Sensor 35", "name": "Ruthven and Humboldt", "latitude": 42.31267, "longitude": -71.09006},
+  {"group": "Heat Sensors", "id": "heat:36", "filterId": "36", "displayId": "Heat Sensor 36", "name": "Waumbeck and Warren", "latitude": 42.3133, "longitude": -71.0837},
+  {"group": "Heat Sensors", "id": "heat:37", "filterId": "37", "displayId": "Heat Sensor 37", "name": "Crawford (behind Crispus Attucks Children Center)", "latitude": 42.31387, "longitude": -71.09082},
+  {"group": "Heat Sensors", "id": "heat:38", "filterId": "38", "displayId": "Heat Sensor 38", "name": "Elm Hill and Crawford", "latitude": 42.311667, "longitude": -71.085833},
+  {"group": "Heat Sensors", "id": "heat:39", "filterId": "39", "displayId": "Heat Sensor 39", "name": "Batchelder and Marshfield", "latitude": 42.322778, "longitude": -71.069167},
+  {"group": "Heat Sensors", "id": "heat:40", "filterId": "40", "displayId": "Heat Sensor 40", "name": "Hampden and Eustis", "latitude": 42.326944, "longitude": -71.075278},
+  {"group": "Heat Sensors", "id": "heat:41", "filterId": "41", "displayId": "Heat Sensor 41", "name": "Forest St and Vine St", "latitude": 42.32667, "longitude": -71.0775},
+  {"group": "Heat Sensors", "id": "heat:43", "filterId": "43", "displayId": "Heat Sensor 43", "name": "W.Cottage and Brook", "latitude": 42.32069, "longitude": -71.07425},
+  {"group": "Heat Sensors", "id": "heat:44", "filterId": "44", "displayId": "Heat Sensor 44", "name": "Washington St and Bishop Joe L. Smith", "latitude": 42.3062, "longitude": -71.08143},
+  {"group": "Heat Sensors", "id": "heat:45", "filterId": "45", "displayId": "Heat Sensor 45", "name": "Children's Park (Intervale and Normandy)", "latitude": 42.31067, "longitude": -71.07822},
+  {"group": "Heat Sensors", "id": "heat:46", "filterId": "46", "displayId": "Heat Sensor 46", "name": "Bynoe Park", "latitude": 42.329, "longitude": -71.076},
+  {"group": "Heat Sensors", "id": "heat:47", "filterId": "47", "displayId": "Heat Sensor 47", "name": "Elm Hill and Cheney", "latitude": 42.31047, "longitude": -71.08691},
+  {"group": "Heat Sensors", "id": "heat:48", "filterId": "48", "displayId": "Heat Sensor 48", "name": "Quincy and Magnolia", "latitude": 42.31227, "longitude": -71.07349},
+  {"group": "Heat Sensors", "id": "heat:49", "filterId": "49", "displayId": "Heat Sensor 49", "name": "Moreland St, Howes Playground", "latitude": 42.32404, "longitude": -71.07928},
+  {"group": "Heat Sensors", "id": "heat:50", "filterId": "50", "displayId": "Heat Sensor 50", "name": "Warren Pl", "latitude": 42.32787, "longitude": -71.082},
+  {"group": "Heat Sensors", "id": "heat:51", "filterId": "51", "displayId": "Heat Sensor 51", "name": "Normandy and Seaver", "latitude": 42.30499, "longitude": -71.08363},
+  {"group": "Heat Sensors", "id": "heat:52", "filterId": "52", "displayId": "Heat Sensor 52", "name": "Winthrop Playground", "latitude": 42.31742, "longitude": -71.07608},
+  {"group": "Heat Sensors", "id": "heat:53", "filterId": "53", "displayId": "Heat Sensor 53", "name": "Dennis St Park", "latitude": 42.32258, "longitude": -71.07489},
+  {"group": "Heat Sensors", "id": "heat:54", "filterId": "54", "displayId": "Heat Sensor 54", "name": "Freedom House Warren St", "latitude": 42.3108226, "longitude": -71.0832951},
+  {"group": "Heat Sensors", "id": "heat:55", "filterId": "55", "displayId": "Heat Sensor 55", "name": "Fayston and Perth", "latitude": 42.31298, "longitude": -71.07653},
+  {"group": "Heat Sensors", "id": "heat:9", "filterId": "9", "displayId": "Heat Sensor 9", "name": "Savin & Tupelo", "latitude": 42.3167, "longitude": -71.08095},
 ];
-
 const sensorCatalogSources = [
   {
     kind: "air",
@@ -478,6 +488,8 @@ async function loadSensorCatalog() {
           filterId,
           displayId: source.kind === "air" ? filterId : `${type} ${filterId}`,
           name: cleanText(row[source.nameField]),
+          latitude: toNumber(row.Latitude),
+          longitude: toNumber(row.Longitude),
         };
       }).filter(Boolean);
     } catch (error) {
@@ -672,6 +684,7 @@ function clusterOptionsFromRows() {
 }
 
 function sensorOptionsFromRows() {
+  if (state.dataSource !== "uploaded") return [];
   const sensors = new Map();
   state.rows.forEach((row) => {
     if (!row.sensorId || !metricHasValue(row)) return;
@@ -1556,6 +1569,366 @@ function renderScene(canvas) {
   ctx.fillText(label, width * 0.06, height * 0.88);
 }
 
+function sensorKind(sensor) {
+  return sensor.id.split(":")[0];
+}
+
+function mapColorForSensor(sensor) {
+  return {
+    air: "rgba(242, 192, 55, 0.4)",
+    heat: "rgba(193, 48, 37, 0.72)",
+    noise: "rgba(123, 44, 191, 0.4)",
+  }[sensorKind(sensor)] || colors.teal;
+}
+
+function highlightedFillColor() {
+  return "#c13025";
+}
+
+function mappedSensorsForMetric() {
+  return state.sensorCatalog.filter((sensor) => {
+    return catalogSensorMatchesMetric(sensor) &&
+      Number.isFinite(sensor.latitude) &&
+      Number.isFinite(sensor.longitude);
+  });
+}
+
+function selectedReportSensorIds() {
+  const selections = state.template === "trends"
+    ? selectedComparisonLocations().map((location) => comparisonOption(location))
+    : [selectedLocation(els.location.value, comparisonLocationOptions())];
+  return new Set(selections.filter((selection) => selection.kind === "sensor").map((selection) => selection.id));
+}
+
+function selectedMappedSensors() {
+  const selectedIds = selectedReportSensorIds();
+  return mappedSensorsForMetric().filter((sensor) => selectedIds.has(sensor.id));
+}
+
+function sensorLocationValue(sensor) {
+  return locationValue("sensor", sensor.id);
+}
+
+function updateSensorMapDetails(sensors, selected) {
+  const selectedIds = new Set(selected.map((sensor) => sensor.id));
+  els.sensorMapLegend.innerHTML = "";
+  els.sensorMapList.innerHTML = "";
+
+  const buildLegendSwatch = ({ kind, highlighted = false }) => {
+    if ((kind === "air" || kind === "noise" || kind === "heat") && !highlighted) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.setAttribute("aria-hidden", "true");
+      svg.classList.add("map-swatch-svg");
+      const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      polygon.setAttribute("points", "50,5 90,27 90,73 50,95 10,73 10,27");
+      polygon.setAttribute(
+        "fill",
+        kind === "air"
+          ? "rgba(242, 192, 55, 0.4)"
+          : kind === "noise"
+            ? "rgba(123, 44, 191, 0.4)"
+            : "rgba(193, 48, 37, 0.72)",
+      );
+      polygon.setAttribute("stroke", "#181b1f");
+      polygon.setAttribute("stroke-width", "14");
+      svg.append(polygon);
+      return svg;
+    }
+
+    const swatch = document.createElement("i");
+    swatch.className = `map-swatch map-swatch-${kind || "default"}`;
+    if (highlighted) {
+      swatch.className = "map-swatch map-swatch-highlighted";
+      swatch.style.background = highlightedFillColor();
+      swatch.style.border = "3px solid #181b1f";
+      return swatch;
+    }
+
+    swatch.style.background = mapColorForSensor({ id: `${kind}:legend` });
+    if (kind === "heat") {
+      swatch.style.border = "3px solid #c13025";
+    } else if (kind === "air") {
+      swatch.style.border = "3px solid #181b1f";
+    }
+    return swatch;
+  };
+
+  const visibleKinds = Array.from(new Set(sensors.map(sensorKind)));
+  visibleKinds.forEach((kind) => {
+    const legendItem = document.createElement("span");
+    const swatch = buildLegendSwatch({ kind });
+    legendItem.append(swatch, document.createTextNode(`${kind === "air" ? "Air quality" : kind[0].toUpperCase() + kind.slice(1)} sensors`));
+    els.sensorMapLegend.append(legendItem);
+  });
+
+  const highlightedLegend = document.createElement("span");
+  const highlightedSwatch = buildLegendSwatch({ highlighted: true });
+  highlightedLegend.append(highlightedSwatch, document.createTextNode("Highlighted in report"));
+  els.sensorMapLegend.append(highlightedLegend);
+
+  const listSensors = selected.length ? selected : sensors.slice(0, 8);
+  listSensors.forEach((sensor) => {
+    const item = document.createElement("li");
+    item.textContent = `${sensor.name || sensor.displayId} - ${sensor.displayId}`;
+    els.sensorMapList.append(item);
+  });
+  if (!selected.length) {
+    const item = document.createElement("li");
+    item.textContent = "No mapped report sensors selected; showing available sensors for this hazard.";
+    els.sensorMapList.prepend(item);
+  }
+  return selectedIds;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function lonToWorldX(lon, zoom) {
+  return ((lon + 180) / 360) * 256 * (2 ** zoom);
+}
+
+function latToWorldY(lat, zoom) {
+  const clampedLat = clamp(lat, -85.05112878, 85.05112878);
+  const sinLat = Math.sin((clampedLat * Math.PI) / 180);
+  return (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * 256 * (2 ** zoom);
+}
+
+function worldToTile(value) {
+  return Math.floor(value / 256);
+}
+
+function staticMapViewport(sensors, width, height, focusSensors = []) {
+  const viewportSensors = focusSensors.length ? focusSensors : sensors;
+  const minLat = Math.min(...viewportSensors.map((sensor) => sensor.latitude));
+  const maxLat = Math.max(...viewportSensors.map((sensor) => sensor.latitude));
+  const minLon = Math.min(...viewportSensors.map((sensor) => sensor.longitude));
+  const maxLon = Math.max(...viewportSensors.map((sensor) => sensor.longitude));
+  const paddedLatMin = minLat - Math.max((maxLat - minLat) * 0.18, 0.003);
+  const paddedLatMax = maxLat + Math.max((maxLat - minLat) * 0.18, 0.003);
+  const paddedLonMin = minLon - Math.max((maxLon - minLon) * 0.18, 0.003);
+  const paddedLonMax = maxLon + Math.max((maxLon - minLon) * 0.18, 0.003);
+
+  let zoom = 14;
+  for (let candidate = 18; candidate >= 10; candidate -= 1) {
+    const xSpan = lonToWorldX(paddedLonMax, candidate) - lonToWorldX(paddedLonMin, candidate);
+    const ySpan = latToWorldY(paddedLatMin, candidate) - latToWorldY(paddedLatMax, candidate);
+    if (xSpan <= width * 0.82 && ySpan <= height * 0.82) {
+      zoom = candidate;
+      break;
+    }
+  }
+
+  const centerLat = (paddedLatMin + paddedLatMax) / 2;
+  const centerLon = (paddedLonMin + paddedLonMax) / 2;
+  const centerX = lonToWorldX(centerLon, zoom);
+  const centerY = latToWorldY(centerLat, zoom);
+  return {
+    zoom,
+    left: centerX - width / 2,
+    top: centerY - height / 2,
+    width,
+    height,
+  };
+}
+
+function drawSensorPrintMapFallback(ctx, width, height) {
+  ctx.fillStyle = "#eef1ed";
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = "#c9d2ce";
+  ctx.lineWidth = 2;
+  for (let x = -height; x < width; x += 92) {
+    ctx.beginPath();
+    ctx.moveTo(x, height);
+    ctx.lineTo(x + height, 0);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#d9dfdc";
+  ctx.lineWidth = 1;
+  for (let x = 0; x < width; x += 120) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+    ctx.stroke();
+  }
+  for (let y = 0; y < height; y += 120) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+    ctx.stroke();
+  }
+}
+
+function loadTileImage(src) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+}
+
+function drawHexagonPath(ctx, x, y, radius) {
+  ctx.beginPath();
+  for (let point = 0; point < 6; point += 1) {
+    const angle = ((Math.PI / 3) * point) - (Math.PI / 2);
+    const px = x + radius * Math.cos(angle);
+    const py = y + radius * Math.sin(angle);
+    if (point === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+function drawHighlightedLabel(ctx, x, y, text, index = 0) {
+  const safeText = cleanText(text) || "Selected sensor";
+  const rowOffset = index % 2;
+  const offsetY = 22 + rowOffset * 18;
+  ctx.save();
+  ctx.font = "700 15px Inter, sans-serif";
+  const textWidth = ctx.measureText(safeText).width;
+  const paddingX = 10;
+  const labelW = textWidth + paddingX * 2;
+  const labelH = 26;
+  const labelX = x + 14;
+  const labelY = y - offsetY;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+  ctx.strokeStyle = "rgba(24, 27, 31, 0.72)";
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.roundRect(labelX, labelY, labelW, labelH, 7);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#11151a";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(safeText, labelX + paddingX, labelY + labelH / 2);
+  ctx.restore();
+}
+
+function drawSensorMarker(ctx, x, y, sensor, highlighted) {
+  const kind = sensorKind(sensor);
+  ctx.save();
+  if (!highlighted && (kind === "heat" || kind === "air" || kind === "noise")) {
+    drawHexagonPath(ctx, x, y, 10);
+    ctx.fillStyle = kind === "air"
+      ? "rgba(242, 192, 55, 0.4)"
+      : kind === "noise"
+        ? "rgba(123, 44, 191, 0.4)"
+        : "rgba(193, 48, 37, 0.72)";
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#181b1f";
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, highlighted ? 11 : 7, 0, Math.PI * 2);
+    ctx.fillStyle = highlighted ? highlightedFillColor() : "#65737a";
+    ctx.fill();
+    ctx.lineWidth = highlighted ? 4 : 2.5;
+    ctx.strokeStyle = highlighted ? "#181b1f" : "#ffffff";
+    ctx.stroke();
+  }
+  if (highlighted) {
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.beginPath();
+    ctx.arc(x, y, 15, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = []) {
+  if (!els.sensorPrintMap) return;
+  const renderId = state.sensorPrintMapRenderId + 1;
+  state.sensorPrintMapRenderId = renderId;
+  const canvas = els.sensorPrintMap;
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+
+  if (!sensors.length) {
+    drawSensorPrintMapFallback(ctx, width, height);
+    ctx.fillStyle = "#626b76";
+    ctx.font = "700 28px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No mapped sensors are available for this hazard.", width / 2, height / 2);
+    return;
+  }
+
+  const viewport = staticMapViewport(sensors, width, height, focusSensors);
+  const tileMinX = worldToTile(viewport.left);
+  const tileMaxX = worldToTile(viewport.left + viewport.width);
+  const tileMinY = worldToTile(viewport.top);
+  const tileMaxY = worldToTile(viewport.top + viewport.height);
+  const tileJobs = [];
+
+  for (let tileX = tileMinX; tileX <= tileMaxX; tileX += 1) {
+    for (let tileY = tileMinY; tileY <= tileMaxY; tileY += 1) {
+      tileJobs.push({
+        x: tileX * 256 - viewport.left,
+        y: tileY * 256 - viewport.top,
+        src: `https://tile.openstreetmap.org/${viewport.zoom}/${tileX}/${tileY}.png`,
+      });
+    }
+  }
+
+  drawSensorPrintMapFallback(ctx, width, height);
+  const loadedTiles = await Promise.all(tileJobs.map((job) => loadTileImage(job.src).then((image) => ({ ...job, image }))));
+  if (renderId !== state.sensorPrintMapRenderId) return;
+  loadedTiles.forEach((tile) => {
+    if (tile.image) ctx.drawImage(tile.image, tile.x, tile.y, 256, 256);
+  });
+
+  const highlightedPoints = [];
+  sensors.forEach((sensor) => {
+    const highlighted = selectedIds.has(sensor.id);
+    const x = lonToWorldX(sensor.longitude, viewport.zoom) - viewport.left;
+    const y = latToWorldY(sensor.latitude, viewport.zoom) - viewport.top;
+    drawSensorMarker(ctx, x, y, sensor, highlighted);
+    if (highlighted) {
+      highlightedPoints.push({ x, y, label: sensor.name || sensor.displayId || sensor.filterId || "Selected sensor" });
+    }
+  });
+
+  highlightedPoints.forEach((point, index) => {
+    drawHighlightedLabel(ctx, point.x, point.y, point.label, index);
+  });
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+  ctx.fillRect(width - 286, height - 31, 276, 21);
+  ctx.fillStyle = "#2f363c";
+  ctx.font = "700 13px Inter, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("Map data (c) OpenStreetMap contributors", width - 16, height - 16);
+}
+
+function renderSensorMap() {
+  const pageIncluded = Boolean(els.includeMapPage?.checked);
+  if (els.sensorMapPage) els.sensorMapPage.hidden = !pageIncluded;
+  if (!pageIncluded || !els.sensorPrintMap) return;
+
+  const sensors = mappedSensorsForMetric();
+  const selected = selectedMappedSensors();
+  const metricName = metricDisplay(els.calendarMetric.value);
+  const author = els.author.value.trim() || "Name";
+  const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
+
+  els.sensorMapTitle.textContent = `${metricName} sensor locations`;
+  els.sensorMapMeta.textContent = `Prepared by ${author} on ${reportDate}`;
+
+  const selectedIds = updateSensorMapDetails(sensors, selected);
+  state.sensorPrintMapPromise = renderStaticSensorPrintMap(sensors, selectedIds, selected);
+}
+
 function preloadPictureAssets() {
   Object.entries(pictureAssets).forEach(([key, src]) => {
     const image = new Image();
@@ -1574,6 +1947,20 @@ function formatReportDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function loadSampleData() {
+  state.rows = sampleRows;
+  state.dataSource = "sample";
+  els.csvUpload.value = "";
+  els.month.value = "2026-06";
+  updateClusterOptions("Sample Cluster 1");
+  render();
+}
+
+function clearUploadedData() {
+  if (state.dataSource !== "uploaded") return;
+  loadSampleData();
 }
 
 function updateComparisonSummary() {
@@ -1674,6 +2061,7 @@ function render() {
   renderTrendChart();
   renderScene(els.trendScene);
   renderScene(els.snapshotScene);
+  renderSensorMap();
 }
 
 function syncNoteFromEditor(editor) {
@@ -1737,7 +2125,7 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 });
 
 ["input", "change"].forEach((eventName) => {
-  [els.title, els.author, els.reportDate, els.catchphrase, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
+  [els.title, els.author, els.reportDate, els.catchphrase, els.includeMapPage, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
     input.addEventListener(eventName, () => {
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(els.location.value);
       render();
@@ -1829,8 +2217,14 @@ els.csvUpload.addEventListener("change", () => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
+    const parsedRows = normalizeRows(parseCsv(String(reader.result || "")));
+    if (!parsedRows.length) {
+      window.alert("No valid rows were found in the uploaded CSV. Please check the date and metric column names.");
+      return;
+    }
     const previousCluster = els.location.value;
-    state.rows = normalizeRows(parseCsv(reader.result));
+    state.rows = parsedRows;
+    state.dataSource = "uploaded";
     updateClusterOptions(previousCluster);
     render();
   };
@@ -1838,20 +2232,24 @@ els.csvUpload.addEventListener("change", () => {
 });
 
 document.getElementById("loadSampleBtn")?.addEventListener("click", () => {
-  state.rows = sampleRows;
-  els.month.value = "2026-06";
-  updateClusterOptions("Sample Cluster 1");
-  render();
+  loadSampleData();
 });
 
-document.getElementById("printBtn").addEventListener("click", () => window.print());
+document.getElementById("clearDataBtn")?.addEventListener("click", () => {
+  clearUploadedData();
+});
 
-state.rows = sampleRows;
+document.getElementById("printBtn").addEventListener("click", async () => {
+  renderSensorMap();
+  await state.sensorPrintMapPromise;
+  await wait(250);
+  window.print();
+});
+
+loadSampleData();
 state.sensorCatalog = builtInSensorCatalog;
 preloadPictureAssets();
-updateClusterOptions("Sample Cluster 1");
 setTemplate(state.template);
-render();
 loadSensorCatalog().then(() => {
   updateClusterOptions(els.location.value);
   render();

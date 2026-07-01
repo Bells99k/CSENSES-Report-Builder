@@ -49,6 +49,10 @@
             Catchphrase
             <input id="reportCatchphrase" type="text" value="What's going on in Grove Hall?">
           </label>
+          <label class="check-item export-option">
+            <input id="includeMapPage" type="checkbox">
+            <span>Include sensor map page</span>
+          </label>
         </section>
 
         <section>
@@ -118,6 +122,10 @@
             Upload sensor CSV
             <input id="csvUpload" type="file" accept=".csv,text/csv">
           </label>
+          <div class="data-actions" aria-label="Data actions">
+            <button id="loadSampleBtn" type="button">Load sample data</button>
+            <button id="clearDataBtn" type="button">Clear uploaded data</button>
+          </div>
           <p class="hint">Columns can include cluster, sensor_id, date, pm25, pm10, temperature, heat_index, noise, or decibel.</p>
         </section>
       </aside>
@@ -349,6 +357,33 @@
             </article>
           </section>
         </div>
+        <section class="report-page map-page" id="sensorMapPage" hidden>
+          <header class="report-header">
+            <div class="report-masthead">
+              <img class="report-logo" src="assets/common-senses-logo.png" alt="Common Senses logo">
+              <p class="report-kicker">SENSOR LOCATIONS</p>
+              <p class="template-label">Map Appendix</p>
+            </div>
+          </header>
+          <div class="map-page-heading">
+            <div>
+              <p class="eyebrow">Report context</p>
+              <h2 id="sensorMapTitle">Selected sensor locations</h2>
+            </div>
+            <p id="sensorMapMeta" class="report-meta">Prepared by Name on June 24, 2026</p>
+          </div>
+          <div class="panel sensor-map-panel">
+            <div id="sensorMap" class="sensor-map" role="img" aria-label="Interactive map of selected sensor locations"></div>
+            <canvas id="sensorPrintMap" class="sensor-print-map" width="1320" height="1080" aria-label="Printable map of selected sensor locations"></canvas>
+          </div>
+          <div class="map-page-footer">
+            <div class="map-legend" id="sensorMapLegend"></div>
+            <div class="panel map-selection-list">
+              <h3>Sensors highlighted in this report</h3>
+              <ul id="sensorMapList"></ul>
+            </div>
+          </div>
+        </section>
       </section>
     </main>
 
