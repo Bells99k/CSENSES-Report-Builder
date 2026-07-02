@@ -1381,6 +1381,7 @@ th {
   .map-page {
     display: grid;
     grid-template-rows: auto auto auto auto;
+    align-content: start;
     gap: 0.1in;
     width: 198mm;
     height: 285mm;
