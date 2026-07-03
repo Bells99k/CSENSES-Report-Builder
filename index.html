@@ -100,6 +100,28 @@
         </section>
 
         <section>
+          <h2>Data</h2>
+          <label>
+            Upload sensor CSV
+            <input id="csvUpload" type="file" accept=".csv,text/csv">
+          </label>
+          <label>
+            Average period
+            <select id="apiAggregation">
+              <option value="1hour">1 hour</option>
+              <option value="1day" selected>1 day</option>
+            </select>
+          </label>
+          <div class="data-actions" aria-label="Data actions">
+            <button id="loadApiBtn" type="button">Load sensor data</button>
+            <button id="loadSampleBtn" type="button">Load sample data</button>
+            <button id="clearDataBtn" type="button">Reset to sample</button>
+          </div>
+          <p class="hint data-status" id="dataStatus" aria-live="polite">Use API data for Heat Index or Noise sensors, or upload a CSV.</p>
+          <p class="hint">Columns can include cluster, sensor_id, date, pm25, pm10, temperature, heat_index, noise, or decibel.</p>
+        </section>
+
+        <section>
           <h2>Picture</h2>
           <label>
             Choose picture
@@ -114,19 +136,6 @@
             Upload picture
             <input id="imageUpload" type="file" accept="image/*">
           </label>
-        </section>
-
-        <section>
-          <h2>Data</h2>
-          <label>
-            Upload sensor CSV
-            <input id="csvUpload" type="file" accept=".csv,text/csv">
-          </label>
-          <div class="data-actions" aria-label="Data actions">
-            <button id="loadSampleBtn" type="button">Load sample data</button>
-            <button id="clearDataBtn" type="button">Clear uploaded data</button>
-          </div>
-          <p class="hint">Columns can include cluster, sensor_id, date, pm25, pm10, temperature, heat_index, noise, or decibel.</p>
         </section>
       </aside>
 

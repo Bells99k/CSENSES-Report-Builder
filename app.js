@@ -10,6 +10,8 @@ const state = {
   trendHoverDay: null,
   sensorPrintMapPromise: Promise.resolve(),
   sensorPrintMapRenderId: 0,
+  apiLoadId: 0,
+  apiAbortController: null,
   noteHtml: "",
 };
 
@@ -31,6 +33,9 @@ const els = {
   heatThreshold: document.getElementById("heatThreshold"),
   noiseThreshold: document.getElementById("noiseThreshold"),
   calendarMetric: document.getElementById("calendarMetric"),
+  apiAggregation: document.getElementById("apiAggregation"),
+  dataStatus: document.getElementById("dataStatus"),
+  loadApiBtn: document.getElementById("loadApiBtn"),
   sensorSearch: document.getElementById("sensorSearch"),
   sensorSearchBtn: document.getElementById("sensorSearchBtn"),
   sensorSearchResults: document.getElementById("sensorSearchResults"),
@@ -70,6 +75,11 @@ const colors = {
 
 const comparisonColors = ["#111827", "#0057ff", "#7b2cbf", "#00838f", "#d0006f", "#4a4e00", "#6d3900", "#334155"];
 const trendChartPadding = { left: 64, right: 28, top: 30, bottom: 56 };
+const sensorReadingsApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings";
+const apiMetricByReportMetric = {
+  heat: "heat_index",
+  noise: "noise",
+};
 
 const metricLabels = {
   composite: "Composite hazard severity",
@@ -545,6 +555,13 @@ function roundNumber(value) {
   return Math.round(value * 10) / 10;
 }
 
+function setDataStatus(message, tone = "neutral") {
+  if (!els.dataStatus) return;
+  els.dataStatus.textContent = message;
+  els.dataStatus.classList.toggle("is-error", tone === "error");
+  els.dataStatus.classList.toggle("is-success", tone === "success");
+}
+
 function monthInfo() {
   const [year, month] = els.month.value.split("-").map(Number);
   const date = new Date(year, month - 1, 1);
@@ -553,6 +570,15 @@ function monthInfo() {
   const days = new Date(year, month, 0).getDate();
   const start = date.getDay();
   return { year, month, long, short, days, start };
+}
+
+function monthDateRange() {
+  const info = monthInfo();
+  const month = String(info.month).padStart(2, "0");
+  return {
+    start: `${info.year}-${month}-01`,
+    end: `${info.year}-${month}-${String(info.days).padStart(2, "0")}`,
+  };
 }
 
 function thresholds() {
@@ -587,6 +613,11 @@ function filteredRows() {
   const selection = selectedLocation();
   const rows = state.rows.filter((row) => row.date.startsWith(prefix) && rowMatchesLocation(row, selection));
   return averageRowsByDate(rows);
+}
+
+function selectedMetricRows() {
+  const metric = els.calendarMetric.value;
+  return filteredRows().filter((row) => row[metric] !== null && row[metric] !== undefined);
 }
 
 function monthRowsForCluster(cluster) {
@@ -814,6 +845,7 @@ function selectLocationSearchResult(value, label = "") {
   els.sensorSearch.value = label;
   hideSensorSearchResults();
   render();
+  updateDataStatusForSelection();
 }
 
 function renderSensorSearchResults({ force = false } = {}) {
@@ -1328,7 +1360,7 @@ function renderTrendChart() {
   ctx.fillRect(0, 0, width, height);
 
   const { padding, plotW, plotH } = trendChartGeometry(canvas);
-  const maxValue = Math.max(threshold || 0, ...allValues, metric === "heat" ? 100 : 10);
+  const maxValue = Math.max(threshold || 0, ...allValues, 10);
   const standardMax = standardChartCeiling(metric, maxValue);
   const chartMax = Math.ceil((Math.max(maxValue, standardMax) * 1.12) / 10) * 10;
   const rowsByCluster = new Map(series.map((item) => [item.cluster, new Map(item.rows.map((row) => [Number(row.date.slice(-2)), row]))]));
@@ -1954,13 +1986,174 @@ function loadSampleData() {
   state.dataSource = "sample";
   els.csvUpload.value = "";
   els.month.value = "2026-06";
+  setDataStatus("Sample data loaded.", "success");
   updateClusterOptions("Sample Cluster 1");
   render();
 }
 
 function clearUploadedData() {
-  if (state.dataSource !== "uploaded") return;
+  if (state.dataSource !== "uploaded" && state.dataSource !== "api") return;
   loadSampleData();
+}
+
+function updateDataStatusForSelection() {
+  const metric = els.calendarMetric.value;
+  const apiMetric = apiMetricForReportMetric(metric);
+  const selection = selectedLocation();
+  const locationId = apiLocationId(selection);
+  if (!apiMetric || !locationId || selectedMetricRows().length) return;
+  setDataStatus(`No loaded ${metricDisplay(metric)} readings for ${selection.display || selection.label}. Click Load sensor data for the selected month.`, "neutral");
+}
+
+function apiMetricForReportMetric(metric) {
+  return apiMetricByReportMetric[metric] || "";
+}
+
+function apiLocationId(selection) {
+  const value = String(selection.filterId || selection.id || "").trim();
+  return /^\d+$/.test(value) ? value : "";
+}
+
+function apiReadingDate(timestamp) {
+  if (!timestamp) return "";
+  const raw = String(timestamp).trim();
+  const isoDate = raw.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (isoDate) return isoDate;
+  return cleanDate(raw);
+}
+
+function apiReadingValue(reading, apiMetric) {
+  const candidates = [apiMetric, "value", "reading", "avg", "average", "mean"];
+  for (const key of candidates) {
+    const value = toNumber(reading?.[key]);
+    if (value !== null) return value;
+  }
+  return null;
+}
+
+function buildApiReadingsUrl({ locationId, apiMetric, startDate, endDate, aggregation }) {
+  const url = new URL(sensorReadingsApiBaseUrl);
+  url.searchParams.set("location_id", locationId);
+  url.searchParams.set("metric", apiMetric);
+  url.searchParams.set("start_date", startDate);
+  url.searchParams.set("end_date", endDate);
+  url.searchParams.set("aggregation", aggregation || "1day");
+  url.searchParams.set("_", String(Date.now()));
+  return url.toString();
+}
+
+function apiLoadedDateSpan(rows) {
+  const dates = rows.map((row) => row.date).filter(Boolean).sort();
+  if (!dates.length) return "";
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return first === last ? first : `${first} to ${last}`;
+}
+
+function normalizeApiRows(payload, { selection, apiMetric }) {
+  const readings = Array.isArray(payload?.readings) ? payload.readings : (Array.isArray(payload) ? payload : []);
+  const sensorId = String(payload?.location_id ?? selection.filterId ?? selection.id ?? "");
+  const cluster = selection.display || selection.label || `Location ${sensorId}`;
+
+  return readings.map((reading) => {
+    const row = {
+      date: apiReadingDate(reading.timestamp || reading.date || reading.time),
+      cluster,
+      sensorId,
+      air: null,
+      pm10: null,
+      heat: null,
+      noise: null,
+    };
+    const value = apiReadingValue(reading, apiMetric);
+    if (apiMetric === "heat_index") row.heat = value;
+    if (apiMetric === "noise") row.noise = value;
+    return row;
+  }).filter((row) => row.date && (row.heat !== null || row.noise !== null));
+}
+
+async function loadApiData() {
+  const loadId = state.apiLoadId + 1;
+  state.apiLoadId = loadId;
+  if (state.apiAbortController) state.apiAbortController.abort();
+  state.apiAbortController = new AbortController();
+  const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), 20000);
+
+  const metric = els.calendarMetric.value;
+  const apiMetric = apiMetricForReportMetric(metric);
+  if (!apiMetric) {
+    window.clearTimeout(timeoutId);
+    setDataStatus("This API endpoint currently supports Heat Index and Noise. Use CSV/sample data for PM2.5 or PM10.", "error");
+    return;
+  }
+
+  const selection = selectedLocation();
+  const locationId = apiLocationId(selection);
+  if (!locationId) {
+    window.clearTimeout(timeoutId);
+    setDataStatus("Choose a numbered Heat or Noise sensor before loading API data.", "error");
+    return;
+  }
+
+  const { start, end } = monthDateRange();
+  const aggregation = els.apiAggregation?.value || "1day";
+  const requestedLocationValue = els.location.value;
+  const url = buildApiReadingsUrl({
+    locationId,
+    apiMetric,
+    startDate: start,
+    endDate: end,
+    aggregation,
+  });
+
+  const button = els.loadApiBtn;
+  if (button) button.disabled = true;
+  setDataStatus(`Loading ${metricDisplay(metric)} from ${start} to ${end}...`);
+  console.info("CSENSES API request", { locationId, apiMetric, start, end, aggregation, url });
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: state.apiAbortController.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    console.info("CSENSES API response", {
+      status: response.status,
+      locationId: payload?.location_id,
+      metric: payload?.metric,
+      readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
+    });
+    if (!response.ok) {
+      throw new Error(payload?.error || `API request failed with status ${response.status}`);
+    }
+    if (loadId !== state.apiLoadId) return;
+
+    const rows = normalizeApiRows(payload, { selection, apiMetric });
+    if (!rows.length) {
+      throw new Error(`No API readings for ${selection.display || selection.label} from ${start} to ${end}. Try 1 day aggregation or another month.`);
+    }
+
+    state.rows = rows;
+    state.dataSource = "api";
+    els.csvUpload.value = "";
+    updateClusterOptions(requestedLocationValue);
+    els.location.value = requestedLocationValue;
+    state.comparisonLocations = [requestedLocationValue];
+    setDataStatus(`Loaded ${rows.length} ${aggregation} API readings for ${selection.display || selection.label} (${apiLoadedDateSpan(rows)}).`, "success");
+    render();
+  } catch (error) {
+    if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
+    const message = error.name === "AbortError"
+      ? "API request timed out. Try again, or use 1 day aggregation for a smaller response."
+      : (error.message || "Could not load API data.");
+    setDataStatus(message, "error");
+  } finally {
+    window.clearTimeout(timeoutId);
+    if (loadId === state.apiLoadId) {
+      state.apiAbortController = null;
+      if (button) button.disabled = false;
+    }
+  }
 }
 
 function updateComparisonSummary() {
@@ -2129,6 +2322,7 @@ document.querySelectorAll(".template-tab").forEach((button) => {
     input.addEventListener(eventName, () => {
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(els.location.value);
       render();
+      if (input === els.location || input === els.month || input === els.calendarMetric) updateDataStatusForSelection();
     });
   });
 });
@@ -2225,10 +2419,15 @@ els.csvUpload.addEventListener("change", () => {
     const previousCluster = els.location.value;
     state.rows = parsedRows;
     state.dataSource = "uploaded";
+    setDataStatus(`Loaded ${parsedRows.length} CSV rows.`, "success");
     updateClusterOptions(previousCluster);
     render();
   };
   reader.readAsText(file);
+});
+
+els.loadApiBtn?.addEventListener("click", () => {
+  loadApiData();
 });
 
 document.getElementById("loadSampleBtn")?.addEventListener("click", () => {

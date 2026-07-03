@@ -29,30 +29,34 @@ When creating the Static Web App in Azure:
 
 This repo includes `staticwebapp.config.json` for routing, CSV MIME handling, and basic security headers.
 
-## Future API connection
+## Sensor API connection
 
-The browser should not connect directly to the database. The online version should call an API that returns sensor readings by date range and selected sensor.
+The browser calls the Common Senses sensor API directly. The Data panel's `Load sensor data` button builds the query from the current report controls:
 
-Expected API shape:
+- Sensor or sensor cluster: must be a numbered Heat or Noise sensor.
+- What to Report: Heat Index maps to `heat_index`; Noise maps to `noise`.
+- Select month: maps to `start_date` and `end_date`.
+- Average period: maps to `aggregation`.
 
 ```text
-GET /api/sensor-data?start=2026-06-01&end=2026-06-30&sensor_id=S001
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings?location_id=5&metric=heat_index&start_date=2026-01-01&end_date=2026-01-31&aggregation=1day
 ```
 
-Expected JSON fields:
+The endpoint currently reports supported metrics as `heat_index`, `noise`, `temperature`, and `humidity`. This report UI currently loads `heat_index` and `noise` from the API; PM2.5 and PM10 still come from CSV/sample data unless a PM endpoint is added.
+
+Response shape:
 
 ```json
-[
-  {
-    "sensor_id": "S001",
-    "sensor_name": "Grove Hall",
-    "timestamp": "2026-06-01T12:00:00Z",
-    "pm25": 14.2,
-    "pm10": 52.8,
-    "heat_index": 86.4,
-    "noise": 63
-  }
-]
+{
+  "location_id": 5,
+  "metric": "heat_index",
+  "readings": [
+    {
+      "timestamp": "2026-01-02T13:00:00-05:00",
+      "heat_index": 25.67
+    }
+  ]
+}
 ```
 
 ## CSV format

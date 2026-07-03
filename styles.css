@@ -273,7 +273,7 @@ textarea {
 
 .data-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 10px;
 }
@@ -282,6 +282,19 @@ textarea {
   min-height: 36px;
   padding: 0 10px;
   font-size: 0.84rem;
+}
+
+.data-status {
+  min-height: 1.2em;
+  font-weight: 750;
+}
+
+.data-status.is-error {
+  color: var(--coral);
+}
+
+.data-status.is-success {
+  color: var(--teal);
 }
 
 .comparison-selected {
