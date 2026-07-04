@@ -75,10 +75,19 @@ const colors = {
 
 const comparisonColors = ["#111827", "#0057ff", "#7b2cbf", "#00838f", "#d0006f", "#4a4e00", "#6d3900", "#334155"];
 const trendChartPadding = { left: 64, right: 28, top: 30, bottom: 56 };
-const sensorReadingsApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings";
-const apiMetricByReportMetric = {
+const citySensorReadingsApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings";
+const quantaqProxyApiBaseUrl = "/api/quantaq/readings";
+const cityApiMetricByReportMetric = {
   heat: "heat_index",
   noise: "noise",
+};
+const quantaqMetricByReportMetric = {
+  air: "pm25",
+  pm10: "pm10",
+};
+const quantaqPeriodByAveragePeriod = {
+  "1hour": "1h",
+  "1day": "1d",
 };
 
 const metricLabels = {
@@ -1998,15 +2007,24 @@ function clearUploadedData() {
 
 function updateDataStatusForSelection() {
   const metric = els.calendarMetric.value;
-  const apiMetric = apiMetricForReportMetric(metric);
+  const apiMetric = cityApiMetricForReportMetric(metric) || quantaqMetricForReportMetric(metric);
   const selection = selectedLocation();
-  const locationId = apiLocationId(selection);
-  if (!apiMetric || !locationId || selectedMetricRows().length) return;
+  if (!apiMetric || !selectedLocationCanLoadSensorData(selection, metric) || selectedMetricRows().length) return;
   setDataStatus(`No loaded ${metricDisplay(metric)} readings for ${selection.display || selection.label}. Click Load sensor data for the selected month.`, "neutral");
 }
 
-function apiMetricForReportMetric(metric) {
-  return apiMetricByReportMetric[metric] || "";
+function cityApiMetricForReportMetric(metric) {
+  return cityApiMetricByReportMetric[metric] || "";
+}
+
+function quantaqMetricForReportMetric(metric) {
+  return quantaqMetricByReportMetric[metric] || "";
+}
+
+function selectedLocationCanLoadSensorData(selection, metric) {
+  if (cityApiMetricForReportMetric(metric)) return Boolean(apiLocationId(selection));
+  if (quantaqMetricForReportMetric(metric)) return selection.kind === "sensor" && Boolean(selection.filterId);
+  return false;
 }
 
 function apiLocationId(selection) {
@@ -2032,12 +2050,22 @@ function apiReadingValue(reading, apiMetric) {
 }
 
 function buildApiReadingsUrl({ locationId, apiMetric, startDate, endDate, aggregation }) {
-  const url = new URL(sensorReadingsApiBaseUrl);
+  const url = new URL(citySensorReadingsApiBaseUrl);
   url.searchParams.set("location_id", locationId);
   url.searchParams.set("metric", apiMetric);
   url.searchParams.set("start_date", startDate);
   url.searchParams.set("end_date", endDate);
   url.searchParams.set("aggregation", aggregation || "1day");
+  url.searchParams.set("_", String(Date.now()));
+  return url.toString();
+}
+
+function buildQuantaqReadingsUrl({ serialNumber, startDate, endDate, averagePeriod }) {
+  const url = new URL(quantaqProxyApiBaseUrl, window.location.origin);
+  url.searchParams.set("serial_number", serialNumber);
+  url.searchParams.set("start_date", startDate);
+  url.searchParams.set("end_date", endDate);
+  url.searchParams.set("period", quantaqPeriodByAveragePeriod[averagePeriod] || "1d");
   url.searchParams.set("_", String(Date.now()));
   return url.toString();
 }
@@ -2072,6 +2100,39 @@ function normalizeApiRows(payload, { selection, apiMetric }) {
   }).filter((row) => row.date && (row.heat !== null || row.noise !== null));
 }
 
+function normalizeQuantaqRows(payload, { selection, quantaqMetric }) {
+  const readings = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+  const sensorId = String(selection.filterId || selection.id || "");
+  const cluster = selection.display || selection.label || sensorId;
+
+  return readings.map((reading) => {
+    const row = {
+      date: apiReadingDate(reading.period_start || reading.period_start_utc || reading.timestamp_local || reading.timestamp),
+      cluster,
+      sensorId,
+      air: null,
+      pm10: null,
+      heat: null,
+      noise: null,
+    };
+    const value = apiReadingValue(reading, quantaqMetric);
+    if (quantaqMetric === "pm25") row.air = value;
+    if (quantaqMetric === "pm10") row.pm10 = value;
+    return row;
+  }).filter((row) => row.date && (row.air !== null || row.pm10 !== null));
+}
+
+function quantaqFetchHelpMessage(error) {
+  if (error.name === "AbortError") return "";
+  if (window.location.protocol === "file:") {
+    return "PM2.5/PM10 loading needs the local proxy. Run `node local-server.mjs`, then open http://localhost:8000 instead of opening index.html directly.";
+  }
+  if (error instanceof TypeError) {
+    return "Could not reach the local QuantAQ proxy. Make sure `node local-server.mjs` is running and open http://localhost:8000.";
+  }
+  return "";
+}
+
 async function loadApiData() {
   const loadId = state.apiLoadId + 1;
   state.apiLoadId = loadId;
@@ -2080,55 +2141,96 @@ async function loadApiData() {
   const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), 20000);
 
   const metric = els.calendarMetric.value;
-  const apiMetric = apiMetricForReportMetric(metric);
-  if (!apiMetric) {
+  const cityApiMetric = cityApiMetricForReportMetric(metric);
+  const quantaqMetric = quantaqMetricForReportMetric(metric);
+  if (!cityApiMetric && !quantaqMetric) {
     window.clearTimeout(timeoutId);
-    setDataStatus("This API endpoint currently supports Heat Index and Noise. Use CSV/sample data for PM2.5 or PM10.", "error");
+    setDataStatus("Sensor data loading currently supports PM2.5, PM10, Heat Index, and Noise.", "error");
     return;
   }
 
   const selection = selectedLocation();
-  const locationId = apiLocationId(selection);
-  if (!locationId) {
+  const cityLocationId = apiLocationId(selection);
+  if (cityApiMetric && !cityLocationId) {
     window.clearTimeout(timeoutId);
-    setDataStatus("Choose a numbered Heat or Noise sensor before loading API data.", "error");
+    setDataStatus("Choose a numbered Heat or Noise sensor before loading sensor data.", "error");
+    return;
+  }
+  if (quantaqMetric && selection.kind !== "sensor") {
+    window.clearTimeout(timeoutId);
+    setDataStatus("Choose an air quality sensor before loading PM2.5 or PM10 data.", "error");
     return;
   }
 
   const { start, end } = monthDateRange();
   const aggregation = els.apiAggregation?.value || "1day";
   const requestedLocationValue = els.location.value;
-  const url = buildApiReadingsUrl({
-    locationId,
-    apiMetric,
-    startDate: start,
-    endDate: end,
-    aggregation,
-  });
 
   const button = els.loadApiBtn;
   if (button) button.disabled = true;
   setDataStatus(`Loading ${metricDisplay(metric)} from ${start} to ${end}...`);
-  console.info("CSENSES API request", { locationId, apiMetric, start, end, aggregation, url });
 
   try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      signal: state.apiAbortController.signal,
-    });
-    const payload = await response.json().catch(() => ({}));
-    console.info("CSENSES API response", {
-      status: response.status,
-      locationId: payload?.location_id,
-      metric: payload?.metric,
-      readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
-    });
-    if (!response.ok) {
-      throw new Error(payload?.error || `API request failed with status ${response.status}`);
+    let rows = [];
+    let provider = "city";
+    if (quantaqMetric) {
+      provider = "quantaq";
+      const serialNumber = String(selection.filterId || selection.id || "").trim();
+      const url = buildQuantaqReadingsUrl({
+        serialNumber,
+        startDate: start,
+        endDate: end,
+        averagePeriod: aggregation,
+      });
+      console.info("CSENSES QuantAQ API request", { serialNumber, quantaqMetric, start, end, aggregation, url });
+      let response;
+      try {
+        response = await fetch(url, {
+          cache: "no-store",
+          signal: state.apiAbortController.signal,
+        });
+      } catch (error) {
+        const helpMessage = quantaqFetchHelpMessage(error);
+        if (helpMessage) throw new Error(helpMessage);
+        throw error;
+      }
+      const payload = await response.json().catch(() => ({}));
+      console.info("CSENSES QuantAQ API response", {
+        status: response.status,
+        readings: Array.isArray(payload?.data) ? payload.data.length : 0,
+      });
+      if (!response.ok) {
+        throw new Error(payload?.message || payload?.error || `QuantAQ proxy request failed with status ${response.status}`);
+      }
+      if (loadId !== state.apiLoadId) return;
+      rows = normalizeQuantaqRows(payload, { selection, quantaqMetric });
+    } else {
+      const url = buildApiReadingsUrl({
+        locationId: cityLocationId,
+        apiMetric: cityApiMetric,
+        startDate: start,
+        endDate: end,
+        aggregation,
+      });
+      console.info("CSENSES API request", { locationId: cityLocationId, apiMetric: cityApiMetric, start, end, aggregation, url });
+      const response = await fetch(url, {
+        cache: "no-store",
+        signal: state.apiAbortController.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      console.info("CSENSES API response", {
+        status: response.status,
+        locationId: payload?.location_id,
+        metric: payload?.metric,
+        readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
+      });
+      if (!response.ok) {
+        throw new Error(payload?.error || `API request failed with status ${response.status}`);
+      }
+      if (loadId !== state.apiLoadId) return;
+      rows = normalizeApiRows(payload, { selection, apiMetric: cityApiMetric });
     }
-    if (loadId !== state.apiLoadId) return;
 
-    const rows = normalizeApiRows(payload, { selection, apiMetric });
     if (!rows.length) {
       throw new Error(`No API readings for ${selection.display || selection.label} from ${start} to ${end}. Try 1 day aggregation or another month.`);
     }
@@ -2139,7 +2241,8 @@ async function loadApiData() {
     updateClusterOptions(requestedLocationValue);
     els.location.value = requestedLocationValue;
     state.comparisonLocations = [requestedLocationValue];
-    setDataStatus(`Loaded ${rows.length} ${aggregation} API readings for ${selection.display || selection.label} (${apiLoadedDateSpan(rows)}).`, "success");
+    const providerLabel = provider === "quantaq" ? "QuantAQ" : "sensor";
+    setDataStatus(`Loaded ${rows.length} ${aggregation} ${providerLabel} readings for ${selection.display || selection.label} (${apiLoadedDateSpan(rows)}).`, "success");
     render();
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
