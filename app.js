@@ -1298,33 +1298,48 @@ function formatCellValue(row, metric, severity) {
   return row[metric] === null || row[metric] === undefined ? "" : `${row[metric]}`;
 }
 
-function standardChartCeiling(metric, valueMax) {
-  const standard = metricStandards[metric];
-  if (!standard) return valueMax;
-  const finiteBandTops = standard.bands
-    .map((band) => band.max)
-    .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => a - b);
-  return finiteBandTops.find((value) => value >= valueMax) || finiteBandTops[finiteBandTops.length - 1] || valueMax;
+function trendChartScale(values, threshold, metric) {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  if (!finiteValues.length) {
+    return { min: 0, max: Math.max(threshold || 0, 10) };
+  }
+
+  const dataMin = Math.min(...finiteValues);
+  const dataMax = Math.max(...finiteValues);
+  const includeThreshold = Number.isFinite(threshold) &&
+    threshold >= dataMin - Math.max(5, (dataMax - dataMin) * 0.35) &&
+    threshold <= dataMax + Math.max(5, (dataMax - dataMin) * 0.35);
+  const rawMin = includeThreshold ? Math.min(dataMin, threshold) : dataMin;
+  const rawMax = includeThreshold ? Math.max(dataMax, threshold) : dataMax;
+  const rawRange = Math.max(1, rawMax - rawMin);
+  const padding = Math.max(rawRange * 0.18, metric === "noise" ? 2 : 1);
+  const step = rawRange > 80 ? 20 : rawRange > 30 ? 10 : rawRange > 12 ? 5 : 2;
+  const min = Math.max(0, Math.floor((rawMin - padding) / step) * step);
+  const max = Math.ceil((rawMax + padding) / step) * step;
+  return { min, max: Math.max(max, min + step) };
 }
 
-function drawStandardBands(ctx, metric, padding, plotW, plotH, chartMax) {
+function trendValueToY(value, scale, padding, plotH) {
+  const range = scale.max - scale.min || 1;
+  return padding.top + plotH - ((value - scale.min) / range) * plotH;
+}
+
+function drawStandardBands(ctx, metric, padding, plotW, plotH, scale) {
   const standard = metricStandards[metric];
   if (!standard) return;
 
-  const valueToY = (value) => padding.top + plotH - (value / chartMax) * plotH;
   ctx.save();
   ctx.beginPath();
   ctx.rect(padding.left, padding.top, plotW, plotH);
   ctx.clip();
 
   standard.bands.forEach((band) => {
-    const min = Number.isFinite(band.min) ? Math.max(0, band.min) : 0;
-    const max = Number.isFinite(band.max) ? Math.min(chartMax, band.max) : chartMax;
-    if (max <= 0 || min >= chartMax || max <= min) return;
+    const min = Number.isFinite(band.min) ? Math.max(scale.min, band.min) : scale.min;
+    const max = Number.isFinite(band.max) ? Math.min(scale.max, band.max) : scale.max;
+    if (max <= scale.min || min >= scale.max || max <= min) return;
 
-    const yTop = valueToY(max);
-    const yBottom = valueToY(min);
+    const yTop = trendValueToY(max, scale, padding, plotH);
+    const yBottom = trendValueToY(min, scale, padding, plotH);
     ctx.fillStyle = band.color;
     ctx.fillRect(padding.left, yTop, plotW, yBottom - yTop);
   });
@@ -1384,12 +1399,10 @@ function renderTrendChart() {
   ctx.fillRect(0, 0, width, height);
 
   const { padding, plotW, plotH } = trendChartGeometry(canvas);
-  const maxValue = Math.max(threshold || 0, ...allValues, 10);
-  const standardMax = standardChartCeiling(metric, maxValue);
-  const chartMax = Math.ceil((Math.max(maxValue, standardMax) * 1.12) / 10) * 10;
+  const scale = trendChartScale(allValues, threshold, metric);
   const rowsByCluster = new Map(series.map((item) => [item.cluster, new Map(item.rows.map((row) => [Number(row.date.slice(-2)), row]))]));
 
-  drawStandardBands(ctx, metric, padding, plotW, plotH, chartMax);
+  drawStandardBands(ctx, metric, padding, plotW, plotH, scale);
 
   ctx.strokeStyle = "#d3d8da";
   ctx.lineWidth = 1;
@@ -1398,11 +1411,12 @@ function renderTrendChart() {
   ctx.textAlign = "right";
   for (let i = 0; i <= 4; i += 1) {
     const y = padding.top + (plotH / 4) * i;
+    const labelValue = scale.max - ((scale.max - scale.min) / 4) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
-    ctx.fillText(String(Math.round(chartMax - (chartMax / 4) * i)), padding.left - 12, y + 4);
+    ctx.fillText(String(Math.round(labelValue)), padding.left - 12, y + 4);
   }
 
   if (state.trendHoverDay) {
@@ -1417,8 +1431,8 @@ function renderTrendChart() {
     ctx.setLineDash([]);
   }
 
-  if (threshold) {
-    const thresholdY = padding.top + plotH - (threshold / chartMax) * plotH;
+  if (threshold && threshold >= scale.min && threshold <= scale.max) {
+    const thresholdY = trendValueToY(threshold, scale, padding, plotH);
     ctx.setLineDash([8, 7]);
     ctx.strokeStyle = "#7b8288";
     ctx.lineWidth = 2;
@@ -1443,7 +1457,7 @@ function renderTrendChart() {
         continue;
       }
       const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
-      const y = padding.top + plotH - (value / chartMax) * plotH;
+      const y = trendValueToY(value, scale, padding, plotH);
       if (!hasPoint) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
       hasPoint = true;
@@ -1469,7 +1483,7 @@ function renderTrendChart() {
       if (value === null || value === undefined) return;
       const day = Number(row.date.slice(-2));
       const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
-      const y = padding.top + plotH - (value / chartMax) * plotH;
+      const y = trendValueToY(value, scale, padding, plotH);
       const isHovered = state.trendHoverDay === day;
       ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
       ctx.beginPath();
