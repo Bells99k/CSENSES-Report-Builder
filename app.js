@@ -624,6 +624,14 @@ function filteredRows() {
   return averageRowsByDate(rows);
 }
 
+function rowHasMetricValue(row, metric) {
+  return row[metric] !== null && row[metric] !== undefined;
+}
+
+function rowMatchesMonth(row, startDate, endDate) {
+  return row.date >= startDate && row.date <= endDate;
+}
+
 function selectedMetricRows() {
   const metric = els.calendarMetric.value;
   return filteredRows().filter((row) => row[metric] !== null && row[metric] !== undefined);
@@ -693,7 +701,7 @@ function selectedHazardMetric() {
 }
 
 function metricHasValue(row, metric = selectedHazardMetric()) {
-  return row[metric] !== null && row[metric] !== undefined;
+  return rowHasMetricValue(row, metric);
 }
 
 function catalogSensorMatchesMetric(sensor, metric = selectedHazardMetric()) {
@@ -793,7 +801,8 @@ function locationDisplay(value = els.location.value) {
 
 function rowMatchesLocation(row, selection) {
   if (selection.kind === "sensor") {
-    return row.sensorId && row.sensorId === selection.filterId;
+    return Boolean(row.locationValue && row.locationValue === selection.value) ||
+      Boolean(row.sensorId && (row.sensorId === selection.filterId || row.sensorId === selection.id));
   }
   return row.cluster === selection.filterId;
 }
@@ -1197,13 +1206,10 @@ function calendarBandClass(row, metric) {
   return standardBand(metric, row, rowSeverity(row, metric, thresholds()))?.className || "";
 }
 
-function renderStandards(metric) {
-  const standard = metricStandards[metric] || metricStandards.composite;
-  const title = document.getElementById("standardsTitle");
-  const graphic = document.getElementById("standardsGraphic");
-  title.textContent = standard.title;
+function renderStandardsGraphic(graphic, standard) {
+  if (!graphic) return;
   graphic.innerHTML = "";
-  graphic.className = `hi-legend standard-legend standard-legend-${metric}`;
+  graphic.className = `hi-legend standard-legend standard-legend-${standard.metric}`;
   graphic.style.setProperty("--legend-columns", standard.bands.length);
   graphic.setAttribute("aria-label", `${standard.title} standards color scale`);
 
@@ -1215,6 +1221,15 @@ function renderStandards(metric) {
     item.innerHTML = `${band.label}<small>${band.detail}</small>`;
     graphic.append(item);
   });
+}
+
+function renderStandards(metric) {
+  const standard = metricStandards[metric] || metricStandards.composite;
+  const renderStandard = { ...standard, metric };
+  const title = document.getElementById("standardsTitle");
+  if (title) title.textContent = renderStandard.title;
+  renderStandardsGraphic(document.getElementById("standardsGraphic"), renderStandard);
+  renderStandardsGraphic(document.getElementById("comparisonStandardsGraphic"), renderStandard);
 }
 
 function darkTextOn(color) {
@@ -2088,6 +2103,7 @@ function normalizeApiRows(payload, { selection, apiMetric }) {
       date: apiReadingDate(reading.timestamp || reading.date || reading.time),
       cluster,
       sensorId,
+      locationValue: selection.value,
       air: null,
       pm10: null,
       heat: null,
@@ -2110,6 +2126,7 @@ function normalizeQuantaqRows(payload, { selection, quantaqMetric }) {
       date: apiReadingDate(reading.period_start || reading.period_start_utc || reading.timestamp_local || reading.timestamp),
       cluster,
       sensorId,
+      locationValue: selection.value,
       air: null,
       pm10: null,
       heat: null,
@@ -2122,6 +2139,21 @@ function normalizeQuantaqRows(payload, { selection, quantaqMetric }) {
   }).filter((row) => row.date && (row.air !== null || row.pm10 !== null));
 }
 
+function mergeLoadedRows(nextRows, { selection, metric, startDate, endDate }) {
+  const keptRows = state.rows.filter((row) => {
+    if (!rowMatchesMonth(row, startDate, endDate)) return true;
+    if (!rowMatchesLocation(row, selection)) return true;
+    return !rowHasMetricValue(row, metric);
+  });
+  state.rows = [...keptRows, ...nextRows];
+}
+
+function includeComparisonLocation(value) {
+  state.comparisonLocations = [value, ...state.comparisonLocations]
+    .filter((location, index, all) => location && all.indexOf(location) === index)
+    .slice(0, 8);
+}
+
 function quantaqFetchHelpMessage(error) {
   if (error.name === "AbortError") return "";
   if (window.location.protocol === "file:") {
@@ -2131,6 +2163,80 @@ function quantaqFetchHelpMessage(error) {
     return "Could not reach the local QuantAQ proxy. Make sure `node local-server.mjs` is running and open http://localhost:8000.";
   }
   return "";
+}
+
+async function fetchRowsForSelection(selection, { metric, cityApiMetric, quantaqMetric, start, end, aggregation, signal }) {
+  if (quantaqMetric) {
+    const serialNumber = String(selection.filterId || selection.id || "").trim();
+    const url = buildQuantaqReadingsUrl({
+      serialNumber,
+      startDate: start,
+      endDate: end,
+      averagePeriod: aggregation,
+    });
+    console.info("CSENSES QuantAQ API request", { serialNumber, quantaqMetric, start, end, aggregation, url });
+    let response;
+    try {
+      response = await fetch(url, {
+        cache: "no-store",
+        signal,
+      });
+    } catch (error) {
+      const helpMessage = quantaqFetchHelpMessage(error);
+      if (helpMessage) throw new Error(helpMessage);
+      throw error;
+    }
+    const payload = await response.json().catch(() => ({}));
+    console.info("CSENSES QuantAQ API response", {
+      status: response.status,
+      readings: Array.isArray(payload?.data) ? payload.data.length : 0,
+    });
+    if (!response.ok) {
+      throw new Error(payload?.message || payload?.error || `QuantAQ proxy request failed with status ${response.status}`);
+    }
+    return {
+      provider: "quantaq",
+      rows: normalizeQuantaqRows(payload, { selection, quantaqMetric }),
+    };
+  }
+
+  const cityLocationId = apiLocationId(selection);
+  const url = buildApiReadingsUrl({
+    locationId: cityLocationId,
+    apiMetric: cityApiMetric,
+    startDate: start,
+    endDate: end,
+    aggregation,
+  });
+  console.info("CSENSES API request", { locationId: cityLocationId, apiMetric: cityApiMetric, start, end, aggregation, url });
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal,
+  });
+  const payload = await response.json().catch(() => ({}));
+  console.info("CSENSES API response", {
+    status: response.status,
+    locationId: payload?.location_id,
+    metric: payload?.metric,
+    readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
+  });
+  if (!response.ok) {
+    throw new Error(payload?.error || `API request failed with status ${response.status}`);
+  }
+  return {
+    provider: "city",
+    rows: normalizeApiRows(payload, { selection, apiMetric: cityApiMetric }),
+  };
+}
+
+function selectedLoadLocations(metric) {
+  const values = state.template === "trends" ? selectedComparisonLocations() : [els.location.value];
+  return values
+    .map((value) => selectedLocation(value))
+    .filter((selection, index, all) => {
+      return selectedLocationCanLoadSensorData(selection, metric) &&
+        all.findIndex((item) => item.value === selection.value) === index;
+    });
 }
 
 async function loadApiData() {
@@ -2149,16 +2255,12 @@ async function loadApiData() {
     return;
   }
 
-  const selection = selectedLocation();
-  const cityLocationId = apiLocationId(selection);
-  if (cityApiMetric && !cityLocationId) {
+  const selections = selectedLoadLocations(metric);
+  if (!selections.length) {
     window.clearTimeout(timeoutId);
-    setDataStatus("Choose a numbered Heat or Noise sensor before loading sensor data.", "error");
-    return;
-  }
-  if (quantaqMetric && selection.kind !== "sensor") {
-    window.clearTimeout(timeoutId);
-    setDataStatus("Choose an air quality sensor before loading PM2.5 or PM10 data.", "error");
+    setDataStatus(quantaqMetric
+      ? "Choose one or more air quality sensors before loading PM2.5 or PM10 data."
+      : "Choose one or more numbered Heat or Noise sensors before loading sensor data.", "error");
     return;
   }
 
@@ -2168,81 +2270,53 @@ async function loadApiData() {
 
   const button = els.loadApiBtn;
   if (button) button.disabled = true;
-  setDataStatus(`Loading ${metricDisplay(metric)} from ${start} to ${end}...`);
+  setDataStatus(`Loading ${metricDisplay(metric)} for ${selections.length} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
 
   try {
-    let rows = [];
-    let provider = "city";
-    if (quantaqMetric) {
-      provider = "quantaq";
-      const serialNumber = String(selection.filterId || selection.id || "").trim();
-      const url = buildQuantaqReadingsUrl({
-        serialNumber,
-        startDate: start,
-        endDate: end,
-        averagePeriod: aggregation,
-      });
-      console.info("CSENSES QuantAQ API request", { serialNumber, quantaqMetric, start, end, aggregation, url });
-      let response;
-      try {
-        response = await fetch(url, {
-          cache: "no-store",
-          signal: state.apiAbortController.signal,
-        });
-      } catch (error) {
-        const helpMessage = quantaqFetchHelpMessage(error);
-        if (helpMessage) throw new Error(helpMessage);
-        throw error;
-      }
-      const payload = await response.json().catch(() => ({}));
-      console.info("CSENSES QuantAQ API response", {
-        status: response.status,
-        readings: Array.isArray(payload?.data) ? payload.data.length : 0,
-      });
-      if (!response.ok) {
-        throw new Error(payload?.message || payload?.error || `QuantAQ proxy request failed with status ${response.status}`);
-      }
-      if (loadId !== state.apiLoadId) return;
-      rows = normalizeQuantaqRows(payload, { selection, quantaqMetric });
-    } else {
-      const url = buildApiReadingsUrl({
-        locationId: cityLocationId,
-        apiMetric: cityApiMetric,
-        startDate: start,
-        endDate: end,
+    const loaded = [];
+    for (const selection of selections) {
+      const result = await fetchRowsForSelection(selection, {
+        metric,
+        cityApiMetric,
+        quantaqMetric,
+        start,
+        end,
         aggregation,
-      });
-      console.info("CSENSES API request", { locationId: cityLocationId, apiMetric: cityApiMetric, start, end, aggregation, url });
-      const response = await fetch(url, {
-        cache: "no-store",
         signal: state.apiAbortController.signal,
       });
-      const payload = await response.json().catch(() => ({}));
-      console.info("CSENSES API response", {
-        status: response.status,
-        locationId: payload?.location_id,
-        metric: payload?.metric,
-        readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
-      });
-      if (!response.ok) {
-        throw new Error(payload?.error || `API request failed with status ${response.status}`);
-      }
       if (loadId !== state.apiLoadId) return;
-      rows = normalizeApiRows(payload, { selection, apiMetric: cityApiMetric });
+      if (!result.rows.length) {
+        console.info("CSENSES API returned no usable rows", {
+          location: selection.display || selection.label,
+          metric,
+          start,
+          end,
+        });
+        continue;
+      }
+      mergeLoadedRows(result.rows, {
+        selection,
+        metric,
+        startDate: start,
+        endDate: end,
+      });
+      includeComparisonLocation(selection.value);
+      loaded.push({ selection, ...result });
     }
 
-    if (!rows.length) {
-      throw new Error(`No API readings for ${selection.display || selection.label} from ${start} to ${end}. Try 1 day aggregation or another month.`);
+    if (!loaded.length) {
+      throw new Error(`No API readings for the selected ${metricDisplay(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try 1 day aggregation or another month.`);
     }
 
-    state.rows = rows;
     state.dataSource = "api";
     if (els.csvUpload) els.csvUpload.value = "";
     updateClusterOptions(requestedLocationValue);
     els.location.value = requestedLocationValue;
-    state.comparisonLocations = [requestedLocationValue];
-    const providerLabel = provider === "quantaq" ? "QuantAQ" : "sensor";
-    setDataStatus(`Loaded ${rows.length} ${aggregation} ${providerLabel} readings for ${selection.display || selection.label} (${apiLoadedDateSpan(rows)}).`, "success");
+    renderComparisonLocationOptions();
+    const totalRows = loaded.reduce((sum, item) => sum + item.rows.length, 0);
+    const dateSpans = loaded.map((item) => apiLoadedDateSpan(item.rows)).filter(Boolean);
+    const dateSpan = dateSpans.length ? dateSpans[0] : `${start} to ${end}`;
+    setDataStatus(`Loaded ${totalRows} ${aggregation} readings for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).`, "success");
     render();
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
