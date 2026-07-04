@@ -102,10 +102,6 @@
         <section>
           <h2>Data</h2>
           <label>
-            Upload sensor CSV
-            <input id="csvUpload" type="file" accept=".csv,text/csv">
-          </label>
-          <label>
             Average period
             <select id="apiAggregation">
               <option value="1hour">1 hour</option>
@@ -117,8 +113,7 @@
             <button id="loadSampleBtn" type="button">Load sample data</button>
             <button id="clearDataBtn" type="button">Reset to sample</button>
           </div>
-          <p class="hint data-status" id="dataStatus" aria-live="polite">Use API data for Heat Index or Noise sensors, or upload a CSV.</p>
-          <p class="hint">Columns can include cluster, sensor_id, date, pm25, pm10, temperature, heat_index, noise, or decibel.</p>
+          <p class="hint data-status" id="dataStatus" aria-live="polite">Use sensor data for PM2.5, PM10, Heat Index, or Noise.</p>
         </section>
 
         <section>
@@ -182,7 +177,7 @@
                   </div>
                 </div>
               </div>
-              <div class="heatmap-note" id="heatmapNote">Composite hazard severity from uploaded CSV values.</div>
+              <div class="heatmap-note" id="heatmapNote">Composite hazard severity from loaded sensor values.</div>
               <div class="calendar-grid" id="calendarGrid" aria-label="Grid calendar chart"></div>
             </div>
 
@@ -362,7 +357,7 @@
             </div>
             <article class="panel info-panel snapshot-bottom">
               <h3>Recommended interpretation</h3>
-              <p id="recommendationText">Upload a CSV to automatically summarize exceedance patterns for this site.</p>
+              <p id="recommendationText">Load sensor data to automatically summarize exceedance patterns for this site.</p>
             </article>
           </section>
         </div>

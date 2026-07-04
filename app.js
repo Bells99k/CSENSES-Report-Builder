@@ -1481,7 +1481,7 @@ function renderTrendChart() {
     ctx.fillStyle = colors.muted;
     ctx.font = "24px Inter, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Upload a CSV or load the sample data", width / 2, height / 2);
+    ctx.fillText("Load sensor data or sample data", width / 2, height / 2);
     ctx.textAlign = "start";
   }
 }
@@ -1993,7 +1993,7 @@ function formatReportDate(value) {
 function loadSampleData() {
   state.rows = sampleRows;
   state.dataSource = "sample";
-  els.csvUpload.value = "";
+  if (els.csvUpload) els.csvUpload.value = "";
   els.month.value = "2026-06";
   setDataStatus("Sample data loaded.", "success");
   updateClusterOptions("Sample Cluster 1");
@@ -2237,7 +2237,7 @@ async function loadApiData() {
 
     state.rows = rows;
     state.dataSource = "api";
-    els.csvUpload.value = "";
+    if (els.csvUpload) els.csvUpload.value = "";
     updateClusterOptions(requestedLocationValue);
     els.location.value = requestedLocationValue;
     state.comparisonLocations = [requestedLocationValue];
@@ -2347,7 +2347,7 @@ function updateText() {
   const total = stats.counts.air + stats.counts.heat + stats.counts.noise;
   document.getElementById("recommendationText").textContent = total
     ? `${info.short} shows ${total} combined threshold exceedances based on daily averages for ${location}. Compare clustered days against site activity, weather, and nearby sources before assigning cause.`
-    : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another sensor or cluster, or upload site data to refine the interpretation.`;
+    : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another sensor or cluster, or load sensor data to refine the interpretation.`;
 }
 
 function render() {
@@ -2509,7 +2509,7 @@ els.imageUpload.addEventListener("change", () => {
   reader.readAsDataURL(file);
 });
 
-els.csvUpload.addEventListener("change", () => {
+els.csvUpload?.addEventListener("change", () => {
   const file = els.csvUpload.files[0];
   if (!file) return;
   const reader = new FileReader();
