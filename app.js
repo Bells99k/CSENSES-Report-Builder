@@ -799,6 +799,16 @@ function locationDisplay(value = els.location.value) {
   return location.display || location.label || "Sensor Site";
 }
 
+function reportLocationDisplay(value = els.location.value) {
+  const location = selectedLocation(value, comparisonLocationOptions());
+  const display = location.display || location.label || "Sensor Site";
+  if (location.kind !== "sensor") return display;
+  return display
+    .replace(/\s+\([^()]*\)\s*$/u, "")
+    .replace(/\s+-\s+[^-]+$/u, "")
+    .trim() || display;
+}
+
 function rowMatchesLocation(row, selection) {
   if (selection.kind === "sensor") {
     return Boolean(row.locationValue && row.locationValue === selection.value) ||
@@ -821,7 +831,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   const selectedValue = resolvePreferredLocation(preferredCluster, options);
   if (!selectedValue) return;
   els.location.value = selectedValue;
-  els.previewCluster.textContent = locationDisplay(selectedValue);
+  els.previewCluster.textContent = reportLocationDisplay(selectedValue);
   const selected = selectedLocation(selectedValue);
   updateComparisonLocationOptions(clusters, selected.kind === "cluster" ? selected.filterId : clusters[0]);
   if (els.sensorSearch.value.trim()) renderSensorSearchResults();
@@ -1045,14 +1055,13 @@ function selectedComparisonLocations() {
 function comparisonSeries() {
   const metric = els.calendarMetric.value;
   return selectedComparisonLocations().map((locationValueToRead, index) => {
-    const option = comparisonOption(locationValueToRead);
     const rows = monthRowsForLocation(locationValueToRead);
     const values = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
     const peak = values.length ? Math.max(...values.map((row) => row[metric])) : null;
     const average = values.length ? roundNumber(values.reduce((sum, row) => sum + row[metric], 0) / values.length) : null;
     return {
       key: locationValueToRead,
-      cluster: option.display || option.label,
+      cluster: reportLocationDisplay(locationValueToRead),
       rows,
       values,
       peak,
@@ -2379,11 +2388,11 @@ function updateText() {
   const info = monthInfo();
   const stats = exceedanceStats();
   const title = els.title.value.trim() || "Composite Calendar";
-  const location = locationDisplay() || "Sensor Site";
+  const location = reportLocationDisplay() || "Sensor Site";
   const comparedLocations = selectedComparisonLocations();
   const comparedLocationText = comparedLocations.length > 1
     ? `${comparedLocations.length} locations`
-    : (comparedLocations[0] ? locationDisplay(comparedLocations[0]) : location);
+    : (comparedLocations[0] ? reportLocationDisplay(comparedLocations[0]) : location);
   const catchphrase = els.catchphrase.value.trim() || `What's going on in ${location}?`;
   const author = els.author.value.trim() || "Name";
   const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
