@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Sensor Data Architecture</title>
+  <desc id="desc">A clean left-to-right architecture diagram showing how the report builder fetches heat, noise, and air quality sensor readings through API endpoints before rendering report visuals.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .page { fill: #f8fafc; }
+      .title { font: 700 38px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 19px Arial, sans-serif; fill: #475569; }
+      .section-title { font: 700 18px Arial, sans-serif; fill: #334155; text-transform: uppercase; letter-spacing: 1.2px; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .input { fill: #e0f2fe; stroke: #0284c7; }
+      .route { fill: #f1f5f9; stroke: #64748b; }
+      .heat { fill: #ecfdf5; stroke: #059669; }
+      .air { fill: #fff7ed; stroke: #ea580c; }
+      .data { fill: #f5f3ff; stroke: #7c3aed; }
+      .output { fill: #fefce8; stroke: #ca8a04; }
+      .label { font: 700 21px Arial, sans-serif; fill: #0f172a; }
+      .body { font: 400 16px Arial, sans-serif; fill: #334155; }
+      .small { font: 400 14px Arial, sans-serif; fill: #475569; }
+      .note { font: 400 15px Arial, sans-serif; fill: #475569; }
+      .line { stroke: #334155; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .branch { stroke: #64748b; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .branch-join { stroke: #64748b; stroke-width: 3; fill: none; }
+      .group { fill: none; stroke: #e2e8f0; stroke-width: 2; stroke-dasharray: 8 8; }
+      .pill { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; }
+      .pill-text { font: 700 14px Arial, sans-serif; fill: #334155; }
+    </style>
+  </defs>
+
+  <rect class="page" x="0" y="0" width="1600" height="900"/>
+
+  <text class="title" x="72" y="78">Sensor Data Architecture</text>
+  <text class="subtitle" x="72" y="112">The report builder fetches sensor readings on demand, then formats them into report visuals.</text>
+
+  <text class="section-title" x="92" y="174">User Input</text>
+  <rect class="box input" x="72" y="200" width="260" height="132" rx="16"/>
+  <text class="label" x="102" y="246">Report Builder UI</text>
+  <text class="body" x="102" y="276">User selects sensor, hazard,</text>
+  <text class="body" x="102" y="300">month, and average period</text>
+
+  <text class="section-title" x="418" y="174">Request Routing</text>
+  <rect class="box route" x="392" y="200" width="250" height="132" rx="16"/>
+  <text class="label" x="422" y="246">Frontend Logic</text>
+  <text class="body" x="422" y="276">Chooses the right data</text>
+  <text class="body" x="422" y="300">source for the metric</text>
+
+  <text class="section-title" x="755" y="174">Data Sources</text>
+  <rect class="group" x="710" y="190" width="380" height="350" rx="20"/>
+
+  <rect class="box heat" x="760" y="235" width="280" height="116" rx="16"/>
+  <text class="label" x="790" y="278">Heat + Noise</text>
+  <text class="body" x="790" y="307">Existing Azure Function</text>
+  <text class="small" x="790" y="329">Reads from sensor database</text>
+
+  <rect class="box air" x="760" y="395" width="280" height="116" rx="16"/>
+  <text class="label" x="790" y="438">PM2.5 + PM10</text>
+  <text class="body" x="790" y="467">QuantAQ API path</text>
+  <text class="small" x="790" y="489">Azure Function needed for deployment</text>
+
+  <rect class="pill" x="782" y="548" width="236" height="34" rx="17"/>
+  <text class="pill-text" x="808" y="571">Secure backend API endpoints</text>
+
+  <text class="section-title" x="1170" y="174">Data Preparation</text>
+  <rect class="box data" x="1150" y="200" width="270" height="132" rx="16"/>
+  <text class="label" x="1180" y="246">Formatted Readings</text>
+  <text class="body" x="1180" y="276">Clean time-series values</text>
+  <text class="body" x="1180" y="300">merged into report state</text>
+
+  <text class="section-title" x="1170" y="430">Report</text>
+  <text class="section-title" x="1310" y="430">Output</text>
+  <rect class="box input" x="1150" y="456" width="270" height="196" rx="16"/>
+  <text class="label" x="1180" y="502">Report Visuals</text>
+  <text class="body" x="1180" y="534">Calendar view</text>
+  <text class="body" x="1180" y="566">Summary boxes</text>
+  <text class="body" x="1180" y="598">Multi-Sensor Line Chart</text>
+
+  <path class="line" d="M 332 266 L 392 266"/>
+
+  <path class="branch" d="M 642 266 L 700 266 L 700 293 L 760 293"/>
+  <path class="branch" d="M 642 266 L 700 266 L 700 453 L 760 453"/>
+
+  <path class="branch" d="M 1040 293 L 1100 293 L 1100 250 L 1150 250"/>
+  <path class="branch-join" d="M 1040 453 L 1100 453 L 1100 293"/>
+
+  <path class="line" d="M 1285 332 L 1285 456"/>
+
+  <text class="note" x="72" y="748">Current status: heat and noise use the existing Azure Function. Air quality works locally through a proxy and needs a deployed Azure Function endpoint for GitHub Pages.</text>
+</svg>
