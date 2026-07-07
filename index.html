@@ -88,6 +88,12 @@
           <div class="field-group" data-template-control="trends" hidden>
             <p class="field-label">Comparison locations</p>
             <div class="comparison-picker">
+              <label class="comparison-select-label">
+                Add from sensor list
+                <select id="comparisonSelect">
+                  <option value="">Choose a sensor</option>
+                </select>
+              </label>
               <div class="sensor-search comparison-search">
                 <input id="comparisonSearch" type="search" placeholder="Search sensors or groups" autocomplete="off" aria-controls="comparisonSearchResults">
                 <button id="comparisonSearchBtn" type="button">Add</button>

@@ -308,6 +308,10 @@ textarea {
   background: #fbfcfc;
 }
 
+.comparison-select-label {
+  margin-top: 0;
+}
+
 .comparison-chip {
   display: inline-flex;
   align-items: center;

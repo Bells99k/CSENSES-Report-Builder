@@ -42,6 +42,7 @@ const els = {
   comparisonSearch: document.getElementById("comparisonSearch"),
   comparisonSearchBtn: document.getElementById("comparisonSearchBtn"),
   comparisonSearchResults: document.getElementById("comparisonSearchResults"),
+  comparisonSelect: document.getElementById("comparisonSelect"),
   comparisonSelected: document.getElementById("comparisonSelected"),
   comparisonLocations: document.getElementById("comparisonLocations"),
   comparisonLegend: document.getElementById("comparisonLegend"),
@@ -1011,7 +1012,33 @@ function updateComparisonLocationOptions(clusters, primaryCluster = els.location
 
 function renderComparisonLocationOptions() {
   els.comparisonLocations.innerHTML = "";
+  renderComparisonSelectOptions();
   renderComparisonSelected();
+}
+
+function renderComparisonSelectOptions() {
+  if (!els.comparisonSelect) return;
+  const options = comparisonLocationOptions();
+  els.comparisonSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Choose a sensor";
+  els.comparisonSelect.append(placeholder);
+  const groups = new Map();
+  options.forEach((locationOption) => {
+    if (!groups.has(locationOption.group)) {
+      const group = document.createElement("optgroup");
+      group.label = locationOption.group;
+      groups.set(locationOption.group, group);
+      els.comparisonSelect.append(group);
+    }
+    const group = groups.get(locationOption.group);
+    const option = document.createElement("option");
+    option.value = locationOption.value;
+    option.textContent = locationOption.label;
+    group.append(option);
+  });
+  els.comparisonSelect.value = "";
 }
 
 function comparisonOption(value) {
@@ -2607,6 +2634,12 @@ els.location.addEventListener("change", hideSensorSearchResults);
 els.comparisonSearchBtn.addEventListener("click", () => {
   renderComparisonSearchResults({ force: true });
   els.comparisonSearch.focus();
+});
+els.comparisonSelect?.addEventListener("change", () => {
+  const value = els.comparisonSelect.value;
+  if (!value) return;
+  addComparisonLocation(value);
+  els.comparisonSelect.value = "";
 });
 els.comparisonSearch.addEventListener("input", () => renderComparisonSearchResults());
 els.comparisonSearch.addEventListener("focus", () => {
