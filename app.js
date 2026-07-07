@@ -823,7 +823,25 @@ function rowMatchesLocation(row, selection) {
 function resolvePreferredLocation(preferredLocation, options) {
   if (options.some((option) => option.value === preferredLocation)) return preferredLocation;
   const legacyMatch = options.find((option) => option.id === preferredLocation || option.filterId === preferredLocation || option.label === preferredLocation);
-  return legacyMatch?.value || defaultLocationValue(options);
+  return legacyMatch?.value || equivalentSensorLocationValue(preferredLocation, options) || defaultLocationValue(options);
+}
+
+function equivalentSensorLocationValue(preferredLocation, options) {
+  const selected = parseLocationValue(preferredLocation);
+  if (selected.kind !== "sensor" || !selected.filterId) return "";
+  return options.find((option) => {
+    return option.kind === "sensor" &&
+      option.filterId &&
+      selected.filterId &&
+      option.filterId === selected.filterId;
+  })?.value || "";
+}
+
+function parseLocationValue(value) {
+  const [kind, encodedId = ""] = String(value || "").split(":");
+  const id = decodeURIComponent(encodedId);
+  const [, filterId = id] = id.split(":");
+  return { kind, id, filterId };
 }
 
 function defaultLocationValue(options) {
