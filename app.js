@@ -2291,6 +2291,12 @@ function selectedLoadLocations(metric) {
     });
 }
 
+function sensorTypeLabelForMetric(metric) {
+  if (metric === "air" || metric === "pm10") return "air quality sensor";
+  if (metric === "noise") return "noise sensor";
+  return "heat sensor";
+}
+
 async function loadApiData() {
   const loadId = state.apiLoadId + 1;
   state.apiLoadId = loadId;
@@ -2357,7 +2363,7 @@ async function loadApiData() {
     }
 
     if (!loaded.length) {
-      throw new Error(`No API readings for the selected ${metricDisplay(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try 1 day aggregation or another month.`);
+      throw new Error(`No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
     }
 
     state.dataSource = "api";
