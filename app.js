@@ -823,7 +823,14 @@ function rowMatchesLocation(row, selection) {
 function resolvePreferredLocation(preferredLocation, options) {
   if (options.some((option) => option.value === preferredLocation)) return preferredLocation;
   const legacyMatch = options.find((option) => option.id === preferredLocation || option.filterId === preferredLocation || option.label === preferredLocation);
-  return legacyMatch?.value || options[0]?.value || "";
+  return legacyMatch?.value || defaultLocationValue(options);
+}
+
+function defaultLocationValue(options) {
+  if (selectedHazardMetric() === "noise") {
+    return options.find((option) => option.kind === "sensor" && option.filterId === "2")?.value || options[1]?.value || options[0]?.value || "";
+  }
+  return options[0]?.value || "";
 }
 
 function updateClusterOptions(preferredCluster = els.location.value) {
