@@ -1383,6 +1383,7 @@ th {
     max-width: none;
     min-height: 0;
     height: 285mm;
+    margin: 0 auto;
     border: 0;
     box-shadow: none;
     padding: 0;
@@ -1420,7 +1421,7 @@ th {
   }
 
   .report-header {
-    margin-bottom: 0.05in;
+    margin-bottom: 0.055in;
   }
 
   .report-masthead {
@@ -1429,40 +1430,40 @@ th {
   }
 
   .report-kicker {
-    font-size: 11pt;
+    font-size: 14pt;
   }
 
   .report-logo {
-    width: 1in;
+    width: 1.16in;
   }
 
   .template-label,
   .eyebrow {
-    font-size: 7.5pt;
+    font-size: 9.5pt;
   }
 
   .report-hero-block {
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr) 2.25in;
-    gap: 0.14in;
-    margin-bottom: 0.08in;
-    padding-bottom: 0.07in;
+    gap: 0.16in;
+    margin-bottom: 0.09in;
+    padding-bottom: 0.085in;
   }
 
   .report-catchphrase-column h3 {
-    font-size: 15pt;
+    font-size: 20.5pt;
   }
 
   .report-photo-title h3 {
-    font-size: 17pt;
+    font-size: 22.5pt;
   }
 
   .report-meta {
-    margin-top: 0.06in;
-    font-size: 7.4pt;
+    margin-top: 0.075in;
+    font-size: 10.8pt;
   }
 
   .report-image-panel {
-    height: 0.86in;
+    height: 1.18in;
   }
 
   .panel {
@@ -1474,11 +1475,11 @@ th {
   }
 
   .calendar-panel {
-    padding: 0.075in;
+    padding: 0.08in;
   }
 
   .chart-panel {
-    padding: 0.075in;
+    padding: 0.08in;
   }
 
   .calendar-heading {
@@ -1491,11 +1492,11 @@ th {
   }
 
   .calendar-heading h3 {
-    font-size: 12pt;
+    font-size: 17pt;
   }
 
   .cluster-preview-text {
-    font-size: 8pt;
+    font-size: 12.5pt;
   }
 
   .hi-legend {
@@ -1507,11 +1508,11 @@ th {
   }
 
   .standards-wrap {
-    gap: 0.04in;
+    gap: 0.035in;
   }
 
   .standards-title {
-    font-size: 10pt;
+    font-size: 15.8pt;
   }
 
   .hi-legend .hi-none {
@@ -1541,39 +1542,39 @@ th {
   }
 
   .hi-legend span {
-    min-height: 0.31in;
-    padding: 0.03in;
+    min-height: 0.49in;
+    padding: 0.05in 0.04in;
     border-right-width: 1.25pt;
-    font-size: 6.5pt;
+    font-size: 11pt;
   }
 
   .hi-legend small {
     margin-top: 0.03in;
-    font-size: 5.4pt;
+    font-size: 8.6pt;
   }
 
   .heatmap-note {
     margin: 0 0 0.07in;
-    font-size: 7.5pt;
+    font-size: 10.8pt;
   }
 
   #trendChart {
-    height: 2.85in;
+    height: 3.1in;
   }
 
   .calendar-grid {
-    gap: 3px;
+    gap: 4px;
   }
 
   .weekday {
-    font-size: 6.5pt;
+    font-size: 10.5pt;
   }
 
   .day,
   .heatmap-day {
     background: var(--heat) !important;
-    min-height: 0.26in;
-    padding: 3px;
+    min-height: 0.43in;
+    padding: 4px;
   }
 
   .day.is-empty {
@@ -1605,43 +1606,43 @@ th {
   }
 
   .day-number {
-    font-size: 6pt;
+    font-size: 10.8pt;
   }
 
   .heatmap-value {
-    font-size: 7.5pt;
+    font-size: 13.8pt;
   }
 
   .summary-grid {
-    margin-top: 0.07in;
-    gap: 0.08in;
+    margin-top: 0.08in;
+    gap: 0.1in;
   }
 
   .summary-card {
-    min-height: 0.46in;
-    padding: 0.045in;
+    min-height: 0.92in;
+    padding: 0.09in;
   }
 
   .summary-card p {
-    font-size: 8pt;
+    font-size: 12.4pt;
   }
 
   .summary-card strong {
-    margin-top: 0.06in;
-    font-size: 9pt;
+    margin-top: 0.07in;
+    font-size: 13pt;
   }
 
   .info-panel {
-    min-height: 2.95in;
+    min-height: 2.05in;
     height: auto;
-    margin-top: 0.06in;
+    margin-top: 0.05in;
     padding: 0.07in;
   }
 
   .report-note-input {
     min-height: 0;
     max-height: none;
-    height: 2.68in;
+    height: 1.78in;
     overflow: hidden;
     line-height: 1.12;
   }

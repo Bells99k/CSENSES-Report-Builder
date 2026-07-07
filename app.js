@@ -74,7 +74,9 @@ const colors = {
 };
 
 const comparisonColors = ["#111827", "#0057ff", "#7b2cbf", "#00838f", "#d0006f", "#4a4e00", "#6d3900", "#334155"];
-const trendChartPadding = { left: 64, right: 28, top: 30, bottom: 56 };
+const trendChartPadding = { left: 78, right: 30, top: 34, bottom: 66 };
+const noteWordLimit = 100;
+const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
 const citySensorReadingsApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings";
 const quantaqProxyApiBaseUrl = "/api/quantaq/readings";
 const cityApiMetricByReportMetric = {
@@ -1416,7 +1418,7 @@ function renderTrendChart() {
   ctx.strokeStyle = "#d3d8da";
   ctx.lineWidth = 1;
   ctx.fillStyle = colors.muted;
-  ctx.font = "14px Inter, sans-serif";
+  ctx.font = "20px Inter, sans-serif";
   ctx.textAlign = "right";
   for (let i = 0; i <= 4; i += 1) {
     const y = padding.top + (plotH / 4) * i;
@@ -1425,7 +1427,7 @@ function renderTrendChart() {
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
-    ctx.fillText(String(Math.round(labelValue)), padding.left - 12, y + 4);
+    ctx.fillText(String(Math.round(labelValue)), padding.left - 14, y + 6);
   }
 
   if (state.trendHoverDay) {
@@ -1452,7 +1454,7 @@ function renderTrendChart() {
     ctx.setLineDash([]);
     ctx.fillStyle = "#4d555d";
     ctx.textAlign = "left";
-    ctx.fillText(`Threshold ${threshold} ${unit}`, padding.left + 10, thresholdY - 8);
+    ctx.fillText(`Threshold ${threshold} ${unit}`, padding.left + 12, thresholdY - 10);
   }
 
   const traceSeriesLine = (item) => {
@@ -1510,10 +1512,10 @@ function renderTrendChart() {
   for (let day = 1; day <= info.days; day += 1) {
     if (day !== 1 && day !== info.days && day % 5 !== 0) continue;
     const x = padding.left + (info.days <= 1 ? 0 : (plotW / (info.days - 1)) * (day - 1));
-    ctx.fillText(String(day), x, height - 22);
+    ctx.fillText(String(day), x, height - 28);
   }
   ctx.textAlign = "left";
-  ctx.fillText("Day of month", padding.left, height - 8);
+  ctx.fillText("Day of month", padding.left, height - 10);
 
   if (!allValues.length) {
     ctx.fillStyle = colors.muted;
@@ -2408,7 +2410,7 @@ function updateText() {
   document.getElementById("trendMonth").textContent = info.long;
   els.previewCluster.textContent = location;
   const userNote = els.generalInfo.value.trim();
-  const noteHtml = state.noteHtml || escapeHtml(userNote || "Type in your comments/stories/lived experience here");
+  const noteHtml = state.noteHtml || escapeHtml(userNote || defaultNoteText);
   if (document.activeElement !== els.notePreview) {
     els.notePreview.innerHTML = noteHtml;
   }
@@ -2420,7 +2422,7 @@ function updateText() {
   trendNote.classList.toggle("empty-note", !userNote);
   document.getElementById("snapshotSubhead").textContent = `${location} sensor context and interpretation notes.`;
   document.getElementById("snapshotLocation").textContent = location;
-  document.getElementById("snapshotNotes").textContent = userNote || "Type in your comments/stories/lived experience here";
+  document.getElementById("snapshotNotes").textContent = userNote || defaultNoteText;
 
   const selectedMetric = els.calendarMetric.value;
   const selectedMetricName = metricDisplay(selectedMetric);
@@ -2457,7 +2459,42 @@ function render() {
   renderSensorMap();
 }
 
+function noteWords(text) {
+  return String(text || "").trim().match(/\S+/g) || [];
+}
+
+function truncateNoteText(text) {
+  const words = noteWords(text);
+  return words.length > noteWordLimit ? words.slice(0, noteWordLimit).join(" ") : String(text || "");
+}
+
+function moveCursorToEnd(node) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function enforceNoteWordLimit(editor) {
+  const currentText = editor.textContent || "";
+  const limitedText = truncateNoteText(currentText);
+  if (limitedText === currentText) return false;
+  editor.textContent = limitedText;
+  moveCursorToEnd(editor);
+  return true;
+}
+
+function syncNoteFromTextInput() {
+  const limitedText = truncateNoteText(els.generalInfo.value);
+  if (limitedText !== els.generalInfo.value) els.generalInfo.value = limitedText;
+  state.noteHtml = escapeHtml(limitedText);
+}
+
 function syncNoteFromEditor(editor) {
+  enforceNoteWordLimit(editor);
   state.noteHtml = editor.innerHTML;
   els.generalInfo.value = editor.textContent;
   render();
@@ -2520,6 +2557,7 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 ["input", "change"].forEach((eventName) => {
   [els.title, els.author, els.reportDate, els.catchphrase, els.includeMapPage, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
     input.addEventListener(eventName, () => {
+      if (input === els.generalInfo) syncNoteFromTextInput();
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(els.location.value);
       render();
       if (input === els.location || input === els.month || input === els.calendarMetric) updateDataStatusForSelection();
