@@ -78,19 +78,37 @@ const comparisonColors = ["#111827", "#0057ff", "#7b2cbf", "#00838f", "#d0006f",
 const trendChartPadding = { left: 78, right: 30, top: 34, bottom: 66 };
 const noteWordLimit = 100;
 const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
-const citySensorReadingsApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings";
-const quantaqProxyApiBaseUrl = "/api/quantaq/readings";
-const cityApiMetricByReportMetric = {
-  heat: "heat_index",
-  noise: "noise",
+const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
+const sensorApiMetricByReportMetric = {
+  air: { namespace: "aq", metric: "pm25", rowKey: "air" },
+  pm10: { namespace: "aq", metric: "pm10", rowKey: "pm10" },
+  heat: { namespace: "nu", metric: "heat_index", rowKey: "heat" },
+  noise: { namespace: "nu", metric: "noise", rowKey: "noise" },
 };
-const quantaqMetricByReportMetric = {
-  air: "pm25",
-  pm10: "pm10",
-};
-const quantaqPeriodByAveragePeriod = {
-  "1hour": "1h",
-  "1day": "1d",
+const legacyAqLocationIdByFilterId = {
+  "MOD-PM-01486": "15",
+  "MOD-PM-01487": "2",
+  "MOD-PM-01488": "3",
+  "MOD-PM-01489": "4",
+  "MOD-PM-01490": "5",
+  "MOD-PM-01491": "6",
+  "MOD-PM-01492": "7",
+  "MOD-PM-01493": "8",
+  "MOD-PM-01494": "9",
+  "MOD-PM-01495": "10",
+  "MOD-PM-01548": "11",
+  "MOD-PM-01549": "12",
+  "MOD-PM-01550": "13",
+  "MOD-PM-01592": "14",
+  "MOD-PM-01593": "15",
+  "MOD-PM-01594": "16",
+  "MOD-PM-01595": "17",
+  "MOD-PM-01596": "18",
+  "MOD-PM-01597": "19",
+  "MOD-PM-01598": "20",
+  "MOD-PM-01599": "21",
+  "MOD-PM-01600": "22",
+  "MOD-PM-01601": "23",
 };
 
 const metricLabels = {
@@ -257,6 +275,10 @@ const sensorCatalogSources = [
     idField: "T__RH_sens",
     nameField: "Location",
   },
+];
+const remoteSensorCatalogSources = [
+  { namespace: "aq", kinds: ["air"], label: "Air Quality Sensors" },
+  { namespace: "nu", kinds: ["heat", "noise"], label: "Neighborhood Unit Sensors" },
 ];
 
 const heatIndexBands = [
@@ -494,7 +516,84 @@ function cleanSensorId(value) {
   return text;
 }
 
+function sensorListUrl(namespace) {
+  return `${sensorDataApiBaseUrl}/${namespace}/sensors-list`;
+}
+
+function sensorReadingsUrl(namespace) {
+  return `${sensorDataApiBaseUrl}/${namespace}/readings`;
+}
+
+function sensorDisplayId(kind, filterId) {
+  if (kind === "air") return `AQ Sensor ${filterId}`;
+  if (kind === "noise") return `Noise Sensor ${filterId}`;
+  if (kind === "heat") return `Heat Sensor ${filterId}`;
+  return `Sensor ${filterId}`;
+}
+
+function normalizeSensorName(value) {
+  return cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function fallbackSensorDetails(kind, filterId, name) {
+  const normalizedName = normalizeSensorName(name);
+  return builtInSensorCatalog.find((sensor) => {
+    const sensorKind = sensor.id.split(":")[0];
+    return sensorKind === kind && sensor.filterId === filterId;
+  }) || builtInSensorCatalog.find((sensor) => {
+    const sensorKind = sensor.id.split(":")[0];
+    return sensorKind === kind && normalizedName && normalizeSensorName(sensor.name) === normalizedName;
+  }) || null;
+}
+
+function legacyApiLocationIdForSensor(sensorOrSelection) {
+  const kind = String(sensorOrSelection.id || "").split(":")[0];
+  if (kind !== "air") return "";
+  return legacyAqLocationIdByFilterId[sensorOrSelection.filterId] || "";
+}
+
+function normalizeRemoteSensorCatalog(payload, source) {
+  const sensors = Array.isArray(payload?.sensors) ? payload.sensors : (Array.isArray(payload) ? payload : []);
+  return sensors.flatMap((sensor) => {
+    const filterId = cleanSensorId(sensor.location_id ?? sensor.id ?? sensor.locationId);
+    if (!filterId) return [];
+    const name = cleanText(sensor.location_address || sensor.location || sensor.name || sensor.address);
+    return source.kinds.map((kind) => {
+      const fallback = fallbackSensorDetails(kind, filterId, name);
+      return {
+        group: kind === "air" ? "Air Quality Sensors" : kind === "heat" ? "Heat Sensors" : "Noise Sensors",
+        id: `${kind}:${filterId}`,
+        filterId,
+        apiLocationId: filterId,
+        displayId: sensorDisplayId(kind, filterId),
+        name,
+        latitude: toNumber(sensor.latitude ?? sensor.lat) ?? fallback?.latitude ?? null,
+        longitude: toNumber(sensor.longitude ?? sensor.lon ?? sensor.lng) ?? fallback?.longitude ?? null,
+      };
+    });
+  });
+}
+
+async function loadRemoteSensorCatalog() {
+  const catalogGroups = await Promise.all(remoteSensorCatalogSources.map(async (source) => {
+    try {
+      const response = await fetch(sensorListUrl(source.namespace), { cache: "no-store" });
+      if (!response.ok) return [];
+      return normalizeRemoteSensorCatalog(await response.json(), source);
+    } catch {
+      return [];
+    }
+  }));
+  return catalogGroups.flat();
+}
+
 async function loadSensorCatalog() {
+  const remoteCatalog = await loadRemoteSensorCatalog();
+  if (remoteCatalog.length) {
+    state.sensorCatalog = remoteCatalog;
+    return;
+  }
+
   const catalogGroups = await Promise.all(sensorCatalogSources.map(async (source) => {
     try {
       const response = await fetch(source.path);
@@ -508,6 +607,7 @@ async function loadSensorCatalog() {
           group: source.label,
           id: `${source.kind}:${filterId}`,
           filterId,
+          apiLocationId: source.kind === "air" ? legacyAqLocationIdByFilterId[filterId] || "" : filterId,
           displayId: source.kind === "air" ? filterId : `${type} ${filterId}`,
           name: cleanText(row[source.nameField]),
           latitude: toNumber(row.Latitude),
@@ -765,6 +865,7 @@ function sensorOptionsFromCatalog() {
       group: sensor.group,
       id: sensor.id,
       filterId: sensor.filterId,
+      apiLocationId: sensor.apiLocationId || legacyApiLocationIdForSensor(sensor),
       value: locationValue("sensor", sensor.id),
       label: sensor.name ? `${sensor.name} - ${sensor.displayId}` : sensor.displayId,
       display: sensor.name ? `${sensor.name} (${sensor.displayId})` : sensor.displayId,
@@ -1141,7 +1242,7 @@ function exceedanceStats() {
     };
     Object.keys(counts).forEach((key) => {
       if (flags[key]) counts[key] += 1;
-      if (row[key] !== null) max[key] = max[key] === null ? row[key] : Math.max(max[key], row[key]);
+      if (row[key] !== null && row[key] !== undefined) max[key] = max[key] === null ? row[key] : Math.max(max[key], row[key]);
     });
     byDate.set(row.date, { ...row, flags });
   });
@@ -2099,27 +2200,24 @@ function clearUploadedData() {
 
 function updateDataStatusForSelection() {
   const metric = els.calendarMetric.value;
-  const apiMetric = cityApiMetricForReportMetric(metric) || quantaqMetricForReportMetric(metric);
+  const apiConfig = sensorApiConfigForReportMetric(metric);
   const selection = selectedLocation();
-  if (!apiMetric || !selectedLocationCanLoadSensorData(selection, metric) || selectedMetricRows().length) return;
+  if (!apiConfig || !selectedLocationCanLoadSensorData(selection, metric) || selectedMetricRows().length) return;
   setDataStatus(`No loaded ${metricDisplay(metric)} readings for ${selection.display || selection.label}. Click Load sensor data for the selected month.`, "neutral");
 }
 
-function cityApiMetricForReportMetric(metric) {
-  return cityApiMetricByReportMetric[metric] || "";
-}
-
-function quantaqMetricForReportMetric(metric) {
-  return quantaqMetricByReportMetric[metric] || "";
+function sensorApiConfigForReportMetric(metric) {
+  return sensorApiMetricByReportMetric[metric] || null;
 }
 
 function selectedLocationCanLoadSensorData(selection, metric) {
-  if (cityApiMetricForReportMetric(metric)) return Boolean(apiLocationId(selection));
-  if (quantaqMetricForReportMetric(metric)) return selection.kind === "sensor" && Boolean(selection.filterId);
-  return false;
+  return Boolean(sensorApiConfigForReportMetric(metric) && apiLocationId(selection));
 }
 
 function apiLocationId(selection) {
+  if (selection.apiLocationId) return String(selection.apiLocationId);
+  const legacyLocationId = legacyApiLocationIdForSensor(selection);
+  if (legacyLocationId) return legacyLocationId;
   const value = String(selection.filterId || selection.id || "").trim();
   return /^\d+$/.test(value) ? value : "";
 }
@@ -2141,23 +2239,13 @@ function apiReadingValue(reading, apiMetric) {
   return null;
 }
 
-function buildApiReadingsUrl({ locationId, apiMetric, startDate, endDate, aggregation }) {
-  const url = new URL(citySensorReadingsApiBaseUrl);
+function buildApiReadingsUrl({ namespace, locationId, apiMetric, startDate, endDate, aggregation }) {
+  const url = new URL(sensorReadingsUrl(namespace));
   url.searchParams.set("location_id", locationId);
   url.searchParams.set("metric", apiMetric);
   url.searchParams.set("start_date", startDate);
   url.searchParams.set("end_date", endDate);
   url.searchParams.set("aggregation", aggregation || "1day");
-  url.searchParams.set("_", String(Date.now()));
-  return url.toString();
-}
-
-function buildQuantaqReadingsUrl({ serialNumber, startDate, endDate, averagePeriod }) {
-  const url = new URL(quantaqProxyApiBaseUrl, window.location.origin);
-  url.searchParams.set("serial_number", serialNumber);
-  url.searchParams.set("start_date", startDate);
-  url.searchParams.set("end_date", endDate);
-  url.searchParams.set("period", quantaqPeriodByAveragePeriod[averagePeriod] || "1d");
   url.searchParams.set("_", String(Date.now()));
   return url.toString();
 }
@@ -2170,7 +2258,16 @@ function apiLoadedDateSpan(rows) {
   return first === last ? first : `${first} to ${last}`;
 }
 
-function normalizeApiRows(payload, { selection, apiMetric }) {
+function blankMetricRow() {
+  return {
+    air: null,
+    pm10: null,
+    heat: null,
+    noise: null,
+  };
+}
+
+function normalizeApiRows(payload, { selection, apiConfig }) {
   const readings = Array.isArray(payload?.readings) ? payload.readings : (Array.isArray(payload) ? payload : []);
   const sensorId = String(payload?.location_id ?? selection.filterId ?? selection.id ?? "");
   const cluster = selection.display || selection.label || `Location ${sensorId}`;
@@ -2181,39 +2278,12 @@ function normalizeApiRows(payload, { selection, apiMetric }) {
       cluster,
       sensorId,
       locationValue: selection.value,
-      air: null,
-      pm10: null,
-      heat: null,
-      noise: null,
+      ...blankMetricRow(),
     };
-    const value = apiReadingValue(reading, apiMetric);
-    if (apiMetric === "heat_index") row.heat = value;
-    if (apiMetric === "noise") row.noise = value;
+    const value = apiReadingValue(reading, apiConfig.metric);
+    row[apiConfig.rowKey] = value;
     return row;
-  }).filter((row) => row.date && (row.heat !== null || row.noise !== null));
-}
-
-function normalizeQuantaqRows(payload, { selection, quantaqMetric }) {
-  const readings = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
-  const sensorId = String(selection.filterId || selection.id || "");
-  const cluster = selection.display || selection.label || sensorId;
-
-  return readings.map((reading) => {
-    const row = {
-      date: apiReadingDate(reading.period_start || reading.period_start_utc || reading.timestamp_local || reading.timestamp),
-      cluster,
-      sensorId,
-      locationValue: selection.value,
-      air: null,
-      pm10: null,
-      heat: null,
-      noise: null,
-    };
-    const value = apiReadingValue(reading, quantaqMetric);
-    if (quantaqMetric === "pm25") row.air = value;
-    if (quantaqMetric === "pm10") row.pm10 = value;
-    return row;
-  }).filter((row) => row.date && (row.air !== null || row.pm10 !== null));
+  }).filter((row) => row.date && row[apiConfig.rowKey] !== null);
 }
 
 function mergeLoadedRows(nextRows, { selection, metric, startDate, endDate }) {
@@ -2231,61 +2301,17 @@ function includeComparisonLocation(value) {
     .slice(0, 8);
 }
 
-function quantaqFetchHelpMessage(error) {
-  if (error.name === "AbortError") return "";
-  if (window.location.protocol === "file:") {
-    return "PM2.5/PM10 loading needs the local proxy. Run `node local-server.mjs`, then open http://localhost:8000 instead of opening index.html directly.";
-  }
-  if (error instanceof TypeError) {
-    return "Could not reach the local QuantAQ proxy. Make sure `node local-server.mjs` is running and open http://localhost:8000.";
-  }
-  return "";
-}
-
-async function fetchRowsForSelection(selection, { metric, cityApiMetric, quantaqMetric, start, end, aggregation, signal }) {
-  if (quantaqMetric) {
-    const serialNumber = String(selection.filterId || selection.id || "").trim();
-    const url = buildQuantaqReadingsUrl({
-      serialNumber,
-      startDate: start,
-      endDate: end,
-      averagePeriod: aggregation,
-    });
-    console.info("CSENSES QuantAQ API request", { serialNumber, quantaqMetric, start, end, aggregation, url });
-    let response;
-    try {
-      response = await fetch(url, {
-        cache: "no-store",
-        signal,
-      });
-    } catch (error) {
-      const helpMessage = quantaqFetchHelpMessage(error);
-      if (helpMessage) throw new Error(helpMessage);
-      throw error;
-    }
-    const payload = await response.json().catch(() => ({}));
-    console.info("CSENSES QuantAQ API response", {
-      status: response.status,
-      readings: Array.isArray(payload?.data) ? payload.data.length : 0,
-    });
-    if (!response.ok) {
-      throw new Error(payload?.message || payload?.error || `QuantAQ proxy request failed with status ${response.status}`);
-    }
-    return {
-      provider: "quantaq",
-      rows: normalizeQuantaqRows(payload, { selection, quantaqMetric }),
-    };
-  }
-
-  const cityLocationId = apiLocationId(selection);
+async function fetchRowsForSelection(selection, { apiConfig, start, end, aggregation, signal }) {
+  const locationId = apiLocationId(selection);
   const url = buildApiReadingsUrl({
-    locationId: cityLocationId,
-    apiMetric: cityApiMetric,
+    namespace: apiConfig.namespace,
+    locationId,
+    apiMetric: apiConfig.metric,
     startDate: start,
     endDate: end,
     aggregation,
   });
-  console.info("CSENSES API request", { locationId: cityLocationId, apiMetric: cityApiMetric, start, end, aggregation, url });
+  console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, apiMetric: apiConfig.metric, start, end, aggregation, url });
   const response = await fetch(url, {
     cache: "no-store",
     signal,
@@ -2301,8 +2327,8 @@ async function fetchRowsForSelection(selection, { metric, cityApiMetric, quantaq
     throw new Error(payload?.error || `API request failed with status ${response.status}`);
   }
   return {
-    provider: "city",
-    rows: normalizeApiRows(payload, { selection, apiMetric: cityApiMetric }),
+    provider: apiConfig.namespace,
+    rows: normalizeApiRows(payload, { selection, apiConfig }),
   };
 }
 
@@ -2330,9 +2356,8 @@ async function loadApiData() {
   const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), 20000);
 
   const metric = els.calendarMetric.value;
-  const cityApiMetric = cityApiMetricForReportMetric(metric);
-  const quantaqMetric = quantaqMetricForReportMetric(metric);
-  if (!cityApiMetric && !quantaqMetric) {
+  const apiConfig = sensorApiConfigForReportMetric(metric);
+  if (!apiConfig) {
     window.clearTimeout(timeoutId);
     setDataStatus("Sensor data loading currently supports PM2.5, PM10, Heat Index, and Noise.", "error");
     return;
@@ -2341,8 +2366,8 @@ async function loadApiData() {
   const selections = selectedLoadLocations(metric);
   if (!selections.length) {
     window.clearTimeout(timeoutId);
-    setDataStatus(quantaqMetric
-      ? "Choose one or more air quality sensors before loading PM2.5 or PM10 data."
+    setDataStatus(apiConfig.namespace === "aq"
+      ? "Choose one or more air quality sensors before loading PM data."
       : "Choose one or more numbered Heat or Noise sensors before loading sensor data.", "error");
     return;
   }
@@ -2359,9 +2384,7 @@ async function loadApiData() {
     const loaded = [];
     for (const selection of selections) {
       const result = await fetchRowsForSelection(selection, {
-        metric,
-        cityApiMetric,
-        quantaqMetric,
+        apiConfig,
         start,
         end,
         aggregation,
@@ -2501,7 +2524,7 @@ function updateText() {
   document.getElementById("heatDaysCell").textContent = stats.counts.heat;
   document.getElementById("noiseDaysCell").textContent = stats.counts.noise;
 
-  const total = stats.counts.air + stats.counts.heat + stats.counts.noise;
+  const total = stats.counts.air + stats.counts.pm10 + stats.counts.heat + stats.counts.noise;
   document.getElementById("recommendationText").textContent = total
     ? `${info.short} shows ${total} combined threshold exceedances based on daily averages for ${location}. Compare clustered days against site activity, weather, and nearby sources before assigning cause.`
     : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another sensor or cluster, or load sensor data to refine the interpretation.`;

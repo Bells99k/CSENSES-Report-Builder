@@ -33,16 +33,19 @@ This repo includes `staticwebapp.config.json` for routing, CSV MIME handling, an
 
 The browser calls the Common Senses sensor API directly. The Data panel's `Load sensor data` button builds the query from the current report controls:
 
-- Sensor or sensor cluster: must be a numbered Heat/Noise sensor, or an air quality sensor serial number.
-- What to Report: Heat Index maps to `heat_index`; Noise maps to `noise`; PM2.5 maps to QuantAQ `pm25`; PM10 maps to QuantAQ `pm10`.
+- Sensor or sensor cluster: must be a numbered AQ or NU sensor location.
+- What to Report: PM2.5 maps to AQ `pm25`; PM10 maps to AQ `pm10`; Heat Index maps to NU `heat_index`; Noise maps to NU `noise`.
 - Select month: maps to `start_date` and `end_date`.
-- Average period: maps to `aggregation`.
+- Average period: maps to `aggregation`; the report UI loads `1day`.
 
 ```text
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/sensors-list
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/sensors-list
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/readings?location_id=13&metric=pm25&start_date=2026-04-01&end_date=2026-04-30&aggregation=1day
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings?location_id=5&metric=heat_index&start_date=2026-01-01&end_date=2026-01-31&aggregation=1day
 ```
 
-The Common Senses endpoint currently reports supported metrics as `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise.
+The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise.
 
 Response shape:
 
@@ -57,20 +60,6 @@ Response shape:
     }
   ]
 }
-```
-
-PM2.5 and PM10 are loaded from the QuantAQ Cloud API. QuantAQ uses HTTP Basic Auth with the API key as the username and a blank password. For local testing, copy `config.local.example.json` to `config.local.json` and paste your key:
-
-```json
-{
-  "quantaqApiKey": "your-key-here"
-}
-```
-
-`config.local.json` is ignored by git. Run the app with the local proxy server so the QuantAQ key stays server-side:
-
-```bash
-node local-server.mjs
 ```
 
 Then open `http://localhost:8000`.
