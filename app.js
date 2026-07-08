@@ -1931,6 +1931,11 @@ function latToWorldY(lat, zoom) {
   return (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * 256 * (2 ** zoom);
 }
 
+function worldYToLat(worldY, zoom) {
+  const n = Math.PI - (2 * Math.PI * worldY) / (256 * (2 ** zoom));
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
 function worldToTile(value) {
   return Math.floor(value / 256);
 }
@@ -2124,6 +2129,96 @@ function drawSensorMarker(ctx, x, y, sensor, highlighted) {
   ctx.restore();
 }
 
+function niceScaleDistance(meters) {
+  if (!Number.isFinite(meters) || meters <= 0) return 100;
+  const exponent = Math.floor(Math.log10(meters));
+  const fraction = meters / (10 ** exponent);
+  const niceFraction = fraction >= 5 ? 5 : fraction >= 2 ? 2 : 1;
+  return niceFraction * (10 ** exponent);
+}
+
+function formatScaleDistance(meters) {
+  if (meters < 1000) return `${Math.round(meters)} m`;
+  const kilometers = meters / 1000;
+  return `${Number.isInteger(kilometers) ? kilometers : kilometers.toFixed(1)} km`;
+}
+
+function drawMapScaleBar(ctx, viewport, width, height) {
+  const centerLat = worldYToLat(viewport.top + height / 2, viewport.zoom);
+  const metersPerPixel = Math.cos((centerLat * Math.PI) / 180) * 40075016.686 / (256 * (2 ** viewport.zoom));
+  const targetPixels = width * 0.16;
+  const distanceMeters = niceScaleDistance(targetPixels * metersPerPixel);
+  const barWidth = Math.max(44, distanceMeters / metersPerPixel);
+  const x = 28;
+  const y = height - 54;
+  const label = formatScaleDistance(distanceMeters);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.strokeStyle = "rgba(24, 27, 31, 0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x - 12, y - 28, barWidth + 24, 46, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = "#181b1f";
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + barWidth, y);
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 8);
+  ctx.lineTo(x, y + 8);
+  ctx.moveTo(x + barWidth, y - 8);
+  ctx.lineTo(x + barWidth, y + 8);
+  ctx.stroke();
+
+  ctx.fillStyle = "#181b1f";
+  ctx.font = "800 15px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText(label, x + barWidth / 2, y - 10);
+  ctx.restore();
+}
+
+function drawNorthArrow(ctx, width) {
+  const x = width - 48;
+  const y = 42;
+  ctx.save();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.strokeStyle = "rgba(24, 27, 31, 0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(x - 25, y - 27, 50, 66, 7);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#181b1f";
+  ctx.beginPath();
+  ctx.moveTo(x, y - 18);
+  ctx.lineTo(x + 13, y + 13);
+  ctx.lineTo(x, y + 7);
+  ctx.lineTo(x - 13, y + 13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 12);
+  ctx.lineTo(x, y + 7);
+  ctx.stroke();
+
+  ctx.fillStyle = "#181b1f";
+  ctx.font = "900 16px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("N", x, y + 17);
+  ctx.restore();
+}
+
 async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = []) {
   if (!els.sensorPrintMap) return;
   const renderId = state.sensorPrintMapRenderId + 1;
@@ -2182,6 +2277,9 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
   highlightedPoints.forEach((point) => {
     drawHighlightedLabel(ctx, point.x, point.y, point.label, placedLabels, width, height);
   });
+
+  drawMapScaleBar(ctx, viewport, width, height);
+  drawNorthArrow(ctx, width);
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
   ctx.fillRect(width - 482, height - 31, 472, 21);
