@@ -478,22 +478,22 @@ textarea {
   align-content: start;
   gap: 10px;
   color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 850;
+}
 
 .map-legend .map-swatch {
-  width: 15px;
-  height: 15px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
 }
 
 .map-legend .map-swatch-heat {
-  width: 17px;
-  height: 17px;
   border-radius: 0;
   clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
 }
 
 .map-legend i.map-swatch-air {
-  width: 17px;
-  height: 17px;
   display: inline-block;
   border-radius: 0 !important;
   -webkit-clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
@@ -501,23 +501,20 @@ textarea {
 }
 
 .map-legend .map-swatch-highlighted {
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
 }
 
 .map-legend .map-swatch-svg {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
-  flex: 0 0 16px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex: 0 0 24px;
   overflow: hidden;
   vertical-align: middle;
-}
-  font-size: 0.88rem;
-  font-weight: 850;
 }
 
 .map-legend span {
@@ -527,8 +524,9 @@ textarea {
 }
 
 .map-legend i {
-  width: 13px;
-  height: 13px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
   border-radius: 50%;
 }
 

@@ -79,6 +79,7 @@ const trendChartPadding = { left: 78, right: 30, top: 34, bottom: 66 };
 const noteWordLimit = 100;
 const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
 const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
+const mapTileBaseUrl = "https://a.basemaps.cartocdn.com/light_all";
 const sensorApiMetricByReportMetric = {
   air: { namespace: "aq", metric: "pm25", rowKey: "air" },
   pm10: { namespace: "aq", metric: "pm10", rowKey: "pm10" },
@@ -117,6 +118,11 @@ const metricLabels = {
   pm10: "PM10",
   heat: "Heat Index classification",
   noise: "Noise",
+};
+const sensorMapFillColors = {
+  air: "rgba(242, 192, 55, 0.4)",
+  heat: "rgba(193, 48, 37, 0.34)",
+  noise: "rgba(123, 44, 191, 0.4)",
 };
 
 const pictureAssets = {
@@ -1808,11 +1814,7 @@ function sensorKind(sensor) {
 }
 
 function mapColorForSensor(sensor) {
-  return {
-    air: "rgba(242, 192, 55, 0.4)",
-    heat: "rgba(193, 48, 37, 0.72)",
-    noise: "rgba(123, 44, 191, 0.4)",
-  }[sensorKind(sensor)] || colors.teal;
+  return sensorMapFillColors[sensorKind(sensor)] || colors.teal;
 }
 
 function highlightedFillColor() {
@@ -1858,11 +1860,7 @@ function updateSensorMapDetails(sensors, selected) {
       polygon.setAttribute("points", "50,5 90,27 90,73 50,95 10,73 10,27");
       polygon.setAttribute(
         "fill",
-        kind === "air"
-          ? "rgba(242, 192, 55, 0.4)"
-          : kind === "noise"
-            ? "rgba(123, 44, 191, 0.4)"
-            : "rgba(193, 48, 37, 0.72)",
+        sensorMapFillColors[kind] || colors.teal,
       );
       polygon.setAttribute("stroke", "#181b1f");
       polygon.setAttribute("stroke-width", "14");
@@ -1943,16 +1941,16 @@ function staticMapViewport(sensors, width, height, focusSensors = []) {
   const maxLat = Math.max(...viewportSensors.map((sensor) => sensor.latitude));
   const minLon = Math.min(...viewportSensors.map((sensor) => sensor.longitude));
   const maxLon = Math.max(...viewportSensors.map((sensor) => sensor.longitude));
-  const paddedLatMin = minLat - Math.max((maxLat - minLat) * 0.18, 0.003);
-  const paddedLatMax = maxLat + Math.max((maxLat - minLat) * 0.18, 0.003);
-  const paddedLonMin = minLon - Math.max((maxLon - minLon) * 0.18, 0.003);
-  const paddedLonMax = maxLon + Math.max((maxLon - minLon) * 0.18, 0.003);
+  const paddedLatMin = minLat - Math.max((maxLat - minLat) * 0.12, 0.0016);
+  const paddedLatMax = maxLat + Math.max((maxLat - minLat) * 0.12, 0.0016);
+  const paddedLonMin = minLon - Math.max((maxLon - minLon) * 0.12, 0.0016);
+  const paddedLonMax = maxLon + Math.max((maxLon - minLon) * 0.12, 0.0016);
 
   let zoom = 14;
   for (let candidate = 18; candidate >= 10; candidate -= 1) {
     const xSpan = lonToWorldX(paddedLonMax, candidate) - lonToWorldX(paddedLonMin, candidate);
     const ySpan = latToWorldY(paddedLatMin, candidate) - latToWorldY(paddedLatMax, candidate);
-    if (xSpan <= width * 0.82 && ySpan <= height * 0.82) {
+    if (xSpan <= width * 0.92 && ySpan <= height * 0.92) {
       zoom = candidate;
       break;
     }
@@ -1972,17 +1970,17 @@ function staticMapViewport(sensors, width, height, focusSensors = []) {
 }
 
 function drawSensorPrintMapFallback(ctx, width, height) {
-  ctx.fillStyle = "#eef1ed";
+  ctx.fillStyle = "#f2f3f3";
   ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = "#c9d2ce";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#d6dadc";
+  ctx.lineWidth = 1.5;
   for (let x = -height; x < width; x += 92) {
     ctx.beginPath();
     ctx.moveTo(x, height);
     ctx.lineTo(x + height, 0);
     ctx.stroke();
   }
-  ctx.strokeStyle = "#d9dfdc";
+  ctx.strokeStyle = "#e2e5e7";
   ctx.lineWidth = 1;
   for (let x = 0; x < width; x += 120) {
     ctx.beginPath();
@@ -2020,29 +2018,80 @@ function drawHexagonPath(ctx, x, y, radius) {
   ctx.closePath();
 }
 
-function drawHighlightedLabel(ctx, x, y, text, index = 0) {
+function rectanglesOverlap(a, b, gap = 6) {
+  return !(
+    a.x + a.width + gap <= b.x ||
+    b.x + b.width + gap <= a.x ||
+    a.y + a.height + gap <= b.y ||
+    b.y + b.height + gap <= a.y
+  );
+}
+
+function labelCandidateFits(candidate, width, height, placedLabels) {
+  const insideCanvas = candidate.x >= 8 &&
+    candidate.y >= 8 &&
+    candidate.x + candidate.width <= width - 8 &&
+    candidate.y + candidate.height <= height - 38;
+  if (!insideCanvas) return false;
+  return !placedLabels.some((placed) => rectanglesOverlap(candidate, placed));
+}
+
+function labelOverlapScore(candidate, placedLabels) {
+  return placedLabels.reduce((score, placed) => {
+    const overlapW = Math.max(0, Math.min(candidate.x + candidate.width, placed.x + placed.width) - Math.max(candidate.x, placed.x));
+    const overlapH = Math.max(0, Math.min(candidate.y + candidate.height, placed.y + placed.height) - Math.max(candidate.y, placed.y));
+    return score + overlapW * overlapH;
+  }, 0);
+}
+
+function drawHighlightedLabel(ctx, x, y, text, placedLabels = [], canvasWidth = 0, canvasHeight = 0) {
   const safeText = cleanText(text) || "Selected sensor";
-  const rowOffset = index % 2;
-  const offsetY = 22 + rowOffset * 18;
   ctx.save();
   ctx.font = "700 15px Inter, sans-serif";
   const textWidth = ctx.measureText(safeText).width;
   const paddingX = 10;
   const labelW = textWidth + paddingX * 2;
   const labelH = 26;
-  const labelX = x + 14;
-  const labelY = y - offsetY;
+  const offsets = [
+    { dx: 16, dy: -34 },
+    { dx: 16, dy: 12 },
+    { dx: -labelW - 16, dy: -34 },
+    { dx: -labelW - 16, dy: 12 },
+    { dx: -labelW / 2, dy: -52 },
+    { dx: -labelW / 2, dy: 24 },
+    { dx: 26, dy: -64 },
+    { dx: -labelW - 26, dy: -64 },
+    { dx: 26, dy: 42 },
+    { dx: -labelW - 26, dy: 42 },
+  ];
+  const candidates = offsets.map((offset) => ({
+    x: x + offset.dx,
+    y: y + offset.dy,
+    width: labelW,
+    height: labelH,
+  }));
+  const boundedCandidates = candidates.map((candidate) => ({
+    ...candidate,
+    x: clamp(candidate.x, 8, Math.max(8, canvasWidth - labelW - 8)),
+    y: clamp(candidate.y, 8, Math.max(8, canvasHeight - labelH - 38)),
+  }));
+  const placement = boundedCandidates.find((candidate) => labelCandidateFits(candidate, canvasWidth, canvasHeight, placedLabels)) ||
+    boundedCandidates
+      .slice()
+      .sort((a, b) => labelOverlapScore(a, placedLabels) - labelOverlapScore(b, placedLabels))[0];
+  placedLabels.push(placement);
+
   ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
   ctx.strokeStyle = "rgba(24, 27, 31, 0.72)";
   ctx.lineWidth = 1.8;
   ctx.beginPath();
-  ctx.roundRect(labelX, labelY, labelW, labelH, 7);
+  ctx.roundRect(placement.x, placement.y, labelW, labelH, 7);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#11151a";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText(safeText, labelX + paddingX, labelY + labelH / 2);
+  ctx.fillText(safeText, placement.x + paddingX, placement.y + labelH / 2);
   ctx.restore();
 }
 
@@ -2051,11 +2100,7 @@ function drawSensorMarker(ctx, x, y, sensor, highlighted) {
   ctx.save();
   if (!highlighted && (kind === "heat" || kind === "air" || kind === "noise")) {
     drawHexagonPath(ctx, x, y, 10);
-    ctx.fillStyle = kind === "air"
-      ? "rgba(242, 192, 55, 0.4)"
-      : kind === "noise"
-        ? "rgba(123, 44, 191, 0.4)"
-        : "rgba(193, 48, 37, 0.72)";
+    ctx.fillStyle = sensorMapFillColors[kind] || colors.teal;
     ctx.fill();
     ctx.lineWidth = 4;
     ctx.strokeStyle = "#181b1f";
@@ -2110,7 +2155,7 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
       tileJobs.push({
         x: tileX * 256 - viewport.left,
         y: tileY * 256 - viewport.top,
-        src: `https://tile.openstreetmap.org/${viewport.zoom}/${tileX}/${tileY}.png`,
+        src: `${mapTileBaseUrl}/${viewport.zoom}/${tileX}/${tileY}.png`,
       });
     }
   }
@@ -2133,16 +2178,17 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
     }
   });
 
-  highlightedPoints.forEach((point, index) => {
-    drawHighlightedLabel(ctx, point.x, point.y, point.label, index);
+  const placedLabels = [];
+  highlightedPoints.forEach((point) => {
+    drawHighlightedLabel(ctx, point.x, point.y, point.label, placedLabels, width, height);
   });
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
-  ctx.fillRect(width - 286, height - 31, 276, 21);
+  ctx.fillRect(width - 482, height - 31, 472, 21);
   ctx.fillStyle = "#2f363c";
   ctx.font = "700 13px Inter, sans-serif";
   ctx.textAlign = "right";
-  ctx.fillText("Map data (c) OpenStreetMap contributors", width - 16, height - 16);
+  ctx.fillText("Map tiles (c) CARTO, map data (c) OpenStreetMap contributors", width - 16, height - 16);
 }
 
 function renderSensorMap() {
