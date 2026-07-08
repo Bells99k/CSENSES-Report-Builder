@@ -1037,10 +1037,24 @@ textarea {
   border: 0;
   background: transparent;
   color: var(--ink);
-  text-align: center;
+  text-align: left;
   resize: none;
   overflow: auto;
   outline: none;
+}
+
+.report-note-input p {
+  margin: 0 0 0.8em;
+  text-align: left;
+}
+
+.report-note-input p:last-child {
+  margin-bottom: 0;
+}
+
+.report-note-input sub {
+  font-size: 0.7em;
+  line-height: 0;
 }
 
 .empty-note {

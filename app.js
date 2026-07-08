@@ -13,6 +13,8 @@ const state = {
   apiLoadId: 0,
   apiAbortController: null,
   noteHtml: "",
+  noteDirty: false,
+  generatedNoteText: "",
 };
 
 const els = {
@@ -303,6 +305,8 @@ const heatIndexBands = [
     max: 90,
     color: "#fffdb0",
     className: "hi-caution-cell",
+    healthEffect: "Fatigue is possible with prolonged exposure and/or physical activity.",
+    recommendation: "Limit your time outdoors; stay well-hydrated; drink 10 gulps every 20 minutes.",
   },
   {
     label: "Extreme Caution",
@@ -311,6 +315,8 @@ const heatIndexBands = [
     max: 103,
     color: "#edd365",
     className: "hi-extreme-caution-cell",
+    healthEffect: "Sunstroke, heat cramps, and heat exhaustion are possible with prolonged exposure and/or physical activity.",
+    recommendation: "Limit strenuous outdoor activity; limit your time outdoors; stay well-hydrated; drink 10 gulps every 20 minutes.",
   },
   {
     label: "Danger",
@@ -319,6 +325,8 @@ const heatIndexBands = [
     max: 125,
     color: "#d1763d",
     className: "hi-danger-cell",
+    healthEffect: "Sunstroke, heat cramps, and heat exhaustion are likely. Heat stroke is possible with prolonged exposure and/or physical activity.",
+    recommendation: "Avoid strenuous outdoor activity; stay indoors in an air-conditioned facility; stay well-hydrated; drink 10 gulps every 20 minutes.",
   },
   {
     label: "Extreme Danger",
@@ -327,6 +335,8 @@ const heatIndexBands = [
     max: Infinity,
     color: "#b03227",
     className: "hi-extreme-danger-cell",
+    healthEffect: "Heat stroke or sunstroke is highly likely with continued exposure.",
+    recommendation: "Avoid strenuous outdoor activity; stay indoors in an air-conditioned facility; stay well-hydrated; drink 10 gulps every 20 minutes; check on your family, friends, and neighbors.",
   },
 ];
 
@@ -347,12 +357,54 @@ const metricStandards = {
     note: "PM2.5 colors follow U.S. EPA Air Quality Index categories for daily average PM2.5 concentrations.",
     noDataColor: "#ffffff",
     bands: [
-      { label: "Good", detail: "0-9", min: 0, max: 9.1, color: "#008334" },
-      { label: "Moderate", detail: "9.1-35.4", min: 9.1, max: 35.5, color: "#ffa331" },
-      { label: "Unhealthy for Sensitive Groups", detail: "35.5-55.4", min: 35.5, max: 55.5, color: "#ff6523" },
-      { label: "Unhealthy", detail: "55.5-125.4", min: 55.5, max: 125.5, color: "#ee1e1e" },
-      { label: "Very Unhealthy", detail: "125.5-225.4", min: 125.5, max: 225.5, color: "#612e61" },
-      { label: "Hazardous", detail: ">=225.5", min: 225.5, max: Infinity, color: "#660e10" },
+      {
+        label: "Good",
+        detail: "0-9",
+        min: 0,
+        max: 9.1,
+        color: "#008334",
+        recommendation: "Air quality is satisfactory, and air pollution poses little or no risk.",
+      },
+      {
+        label: "Moderate",
+        detail: "9.1-35.4",
+        min: 9.1,
+        max: 35.5,
+        color: "#ffa331",
+        recommendation: "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+      },
+      {
+        label: "Unhealthy for Sensitive Groups",
+        detail: "35.5-55.4",
+        min: 35.5,
+        max: 55.5,
+        color: "#ff6523",
+        recommendation: "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+      },
+      {
+        label: "Unhealthy",
+        detail: "55.5-125.4",
+        min: 55.5,
+        max: 125.5,
+        color: "#ee1e1e",
+        recommendation: "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+      },
+      {
+        label: "Very Unhealthy",
+        detail: "125.5-225.4",
+        min: 125.5,
+        max: 225.5,
+        color: "#612e61",
+        recommendation: "Health alert: The risk of health effects is increased for everyone.",
+      },
+      {
+        label: "Hazardous",
+        detail: ">=225.5",
+        min: 225.5,
+        max: Infinity,
+        color: "#660e10",
+        recommendation: "Health warning of emergency conditions: everyone is more likely to be affected.",
+      },
     ],
   },
   pm10: {
@@ -360,12 +412,54 @@ const metricStandards = {
     note: "PM10 colors follow U.S. EPA Air Quality Index categories for daily average PM10 concentrations.",
     noDataColor: "#ffffff",
     bands: [
-      { label: "Good", detail: "0-54", min: 0, max: 55, color: "#008636" },
-      { label: "Moderate", detail: "55-154", min: 55, max: 155, color: "#ffa52f" },
-      { label: "Unhealthy for Sensitive Groups", detail: "155-254", min: 155, max: 255, color: "#ff6221" },
-      { label: "Unhealthy", detail: "255-354", min: 255, max: 355, color: "#e41f21" },
-      { label: "Very Unhealthy", detail: "355-424", min: 355, max: 425, color: "#62346c" },
-      { label: "Hazardous", detail: ">=425", min: 425, max: Infinity, color: "#691011" },
+      {
+        label: "Good",
+        detail: "0-54",
+        min: 0,
+        max: 55,
+        color: "#008636",
+        recommendation: "Air quality is satisfactory, and air pollution poses little or no risk.",
+      },
+      {
+        label: "Moderate",
+        detail: "55-154",
+        min: 55,
+        max: 155,
+        color: "#ffa52f",
+        recommendation: "Air quality is acceptable. However, there may be a risk for some people, particularly those who are unusually sensitive to air pollution.",
+      },
+      {
+        label: "Unhealthy for Sensitive Groups",
+        detail: "155-254",
+        min: 155,
+        max: 255,
+        color: "#ff6221",
+        recommendation: "Members of sensitive groups may experience health effects. The general public is less likely to be affected.",
+      },
+      {
+        label: "Unhealthy",
+        detail: "255-354",
+        min: 255,
+        max: 355,
+        color: "#e41f21",
+        recommendation: "Some members of the general public may experience health effects; members of sensitive groups may experience more serious health effects.",
+      },
+      {
+        label: "Very Unhealthy",
+        detail: "355-424",
+        min: 355,
+        max: 425,
+        color: "#62346c",
+        recommendation: "Health alert: The risk of health effects is increased for everyone.",
+      },
+      {
+        label: "Hazardous",
+        detail: ">=425",
+        min: 425,
+        max: Infinity,
+        color: "#691011",
+        recommendation: "Health warning of emergency conditions: everyone is more likely to be affected.",
+      },
     ],
   },
   heat: {
@@ -381,6 +475,8 @@ const metricStandards = {
       max: band.max,
       color: band.color,
       className: band.className,
+      healthEffect: band.healthEffect,
+      recommendation: band.recommendation,
     })),
   },
   noise: {
@@ -2611,6 +2707,188 @@ function updateComparisonSummary() {
   });
 }
 
+function noteCanUseGeneratedText() {
+  const currentText = els.generalInfo.value.trim();
+  return !state.noteDirty && (!currentText || currentText === defaultNoteText || currentText === state.generatedNoteText);
+}
+
+function formatMonthDay(value) {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en", { month: "short", day: "numeric" });
+}
+
+function formatTextList(items) {
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function rowsForGeneratedNote(metric) {
+  if (state.template === "trends") {
+    return comparisonSeries().flatMap((series) => {
+      return series.values
+        .filter((row) => row[metric] !== null && row[metric] !== undefined)
+        .map((row) => ({ row, location: series.cluster }));
+    });
+  }
+
+  const location = reportLocationDisplay() || "Sensor Site";
+  return filteredRows()
+    .filter((row) => row[metric] !== null && row[metric] !== undefined)
+    .map((row) => ({ row, location }));
+}
+
+function observationGroupsForGeneratedNote(noteRows, metric) {
+  const bands = metricStandards[metric].bands;
+  const groups = bands.map((band, index) => ({
+    band,
+    index,
+    count: 0,
+    dates: new Set(),
+    locations: new Set(),
+  }));
+
+  noteRows.forEach(({ row, location }) => {
+    const band = standardBand(metric, row, null);
+    const index = bands.findIndex((candidate) => candidate.label === band.label);
+    if (index === -1) return;
+    groups[index].count += 1;
+    groups[index].dates.add(row.date);
+    if (location) groups[index].locations.add(location);
+  });
+
+  return groups.filter((group) => group.count);
+}
+
+function generatedNoteObservationPhrase(group, totalCount) {
+  if (state.template === "trends") {
+    if (group.count === totalCount) return `across all ${plural(totalCount, "daily location reading")}`;
+    return `in ${plural(group.count, "daily location reading")}`;
+  }
+
+  const dates = Array.from(group.dates).sort();
+  if (dates.length === totalCount) return `on all ${plural(totalCount, "day")} with data`;
+  if (dates.length <= 3) return `on ${formatTextList(dates.map(formatMonthDay))}`;
+  return `on ${plural(dates.length, "day")}`;
+}
+
+function buildAirQualityGeneratedNote(info, location, metric) {
+  const metricName = metricDisplay(metric);
+  const context = state.template === "trends" ? "across the compared locations" : `at ${location}`;
+  const noteRows = rowsForGeneratedNote(metric);
+  if (!noteRows.length) {
+    return `No observed ${metricName} daily averages are available for ${info.short} ${context}, so the air quality category cannot be summarized.`;
+  }
+
+  const observedGroups = observationGroupsForGeneratedNote(noteRows, metric);
+  const highestGroup = observedGroups.sort((a, b) => b.index - a.index)[0];
+  if (!highestGroup) {
+    return `No observed ${metricName} daily averages are available for ${info.short} ${context}, so the air quality category cannot be summarized.`;
+  }
+
+  const phrase = generatedNoteObservationPhrase(highestGroup, noteRows.length);
+
+  return truncateNoteText(`Based on observed daily ${metricName} averages for ${info.short} ${context}, air quality was in the ${highestGroup.band.label} category ${phrase}.\n${highestGroup.band.recommendation}`);
+}
+
+function buildHeatIndexGeneratedNote(info, location) {
+  const metric = "heat";
+  const context = state.template === "trends" ? "across the compared locations" : `at ${location}`;
+  const noteRows = rowsForGeneratedNote(metric);
+  if (!noteRows.length) {
+    return `No observed daily heat index averages are available for ${info.short} ${context}, so the heat index category cannot be summarized.`;
+  }
+
+  const observedGroups = observationGroupsForGeneratedNote(noteRows, metric);
+  const highestGroup = observedGroups.sort((a, b) => b.index - a.index)[0];
+  if (!highestGroup) {
+    return `No observed daily heat index averages are available for ${info.short} ${context}, so the heat index category cannot be summarized.`;
+  }
+
+  if (highestGroup.index === 0) {
+    const coverage = state.template === "trends"
+      ? `all ${plural(noteRows.length, "daily location reading")} were`
+      : `all ${plural(noteRows.length, "day")} with data were`;
+    return `Based on observed daily heat index averages for ${info.short} ${context}, ${coverage} below 80°F, so no heat index advisory category applied.`;
+  }
+
+  const phrase = generatedNoteObservationPhrase(highestGroup, noteRows.length);
+  return truncateNoteText(`Based on observed daily heat index averages for ${info.short} ${context}, the heat index was in the ${highestGroup.band.label} category ${phrase}. Health effect: ${highestGroup.band.healthEffect}\nRecommendations: ${highestGroup.band.recommendation}`);
+}
+
+function buildGeneratedNote(info, location) {
+  const metric = els.calendarMetric.value;
+  if (metric === "air" || metric === "pm10") return buildAirQualityGeneratedNote(info, location, metric);
+  if (metric === "heat") return buildHeatIndexGeneratedNote(info, location);
+  return "";
+}
+
+function heatIndexGeneratedNoteHtml(note) {
+  const [observation, ...recommendationParts] = note.split("\n");
+  const recommendation = recommendationParts.join("\n").trim();
+  const observationParts = observation.match(/^(Based on observed daily )(heat index)( averages for .*? )(at |across )(.+?)(, the heat index was in the )(.+?)(\. )(Health effect:)( )(.+)$/);
+
+  if (observationParts) {
+    const observationHtml = [
+      escapeHtml(observationParts[1]),
+      `<strong>${escapeHtml(observationParts[2])}</strong>`,
+      escapeHtml(observationParts[3]),
+      escapeHtml(observationParts[4]),
+      `<strong>${escapeHtml(observationParts[5])}</strong>`,
+      escapeHtml(observationParts[6]),
+      `<strong>${escapeHtml(observationParts[7])}</strong>`,
+      escapeHtml(observationParts[8]),
+      `<strong>${escapeHtml(observationParts[9])}</strong>`,
+      escapeHtml(observationParts[10]),
+      escapeHtml(observationParts[11]),
+    ].join("");
+    const recommendationHtml = recommendation
+      ? `<p><strong>${escapeHtml(recommendation)}</strong></p>`
+      : "";
+    return `<p>${observationHtml}</p>${recommendationHtml}`;
+  }
+
+  const contextParts = observation.match(/^(Based on observed daily )(heat index)( averages for .*? )(at |across )(.+?)(, .+)$/);
+  if (!contextParts) return escapeHtml(note);
+
+  const observationHtml = [
+    escapeHtml(contextParts[1]),
+    `<strong>${escapeHtml(contextParts[2])}</strong>`,
+    escapeHtml(contextParts[3]),
+    escapeHtml(contextParts[4]),
+    `<strong>${escapeHtml(contextParts[5])}</strong>`,
+    escapeHtml(contextParts[6]),
+  ].join("");
+  return `<p>${observationHtml}</p>`;
+}
+
+function generatedNoteHtml(note, metric) {
+  if (!note) return "";
+  if (metric === "heat") return heatIndexGeneratedNoteHtml(note);
+  if (metric !== "air" && metric !== "pm10") return escapeHtml(note);
+
+  const [observation, ...recommendationParts] = note.split("\n");
+  const recommendation = recommendationParts.join("\n").trim();
+  if (!recommendation) return escapeHtml(note);
+
+  const observationParts = observation.match(/^(.*?daily )(PM2\.5|PM10)( averages .*?air quality was in the )(.+)(\.)$/);
+  if (!observationParts) {
+    return `<p>${escapeHtml(observation)}</p><p><strong>${escapeHtml(recommendation)}</strong></p>`;
+  }
+
+  const metricHtml = metric === "air" ? "PM<sub>2.5</sub>" : "PM<sub>10</sub>";
+  const observationHtml = [
+    escapeHtml(observationParts[1]),
+    `<strong>${metricHtml}</strong>`,
+    escapeHtml(observationParts[3]),
+    `<strong>${escapeHtml(observationParts[4])}</strong>`,
+    escapeHtml(observationParts[5]),
+  ].join("");
+
+  return `<p>${observationHtml}</p><p><strong>${escapeHtml(recommendation)}</strong></p>`;
+}
+
 function updateText() {
   const info = monthInfo();
   const stats = exceedanceStats();
@@ -2634,6 +2912,12 @@ function updateText() {
   document.getElementById("calendarMonth").textContent = info.long;
   document.getElementById("trendMonth").textContent = info.long;
   els.previewCluster.textContent = location;
+  const generatedNote = buildGeneratedNote(info, location);
+  if (noteCanUseGeneratedText()) {
+    state.generatedNoteText = generatedNote;
+    els.generalInfo.value = generatedNote;
+    state.noteHtml = generatedNoteHtml(generatedNote, els.calendarMetric.value);
+  }
   const userNote = els.generalInfo.value.trim();
   const noteHtml = state.noteHtml || escapeHtml(userNote || defaultNoteText);
   if (document.activeElement !== els.notePreview) {
@@ -2715,13 +2999,16 @@ function enforceNoteWordLimit(editor) {
 function syncNoteFromTextInput() {
   const limitedText = truncateNoteText(els.generalInfo.value);
   if (limitedText !== els.generalInfo.value) els.generalInfo.value = limitedText;
+  const normalizedText = limitedText.trim();
+  state.noteDirty = Boolean(normalizedText && normalizedText !== defaultNoteText && normalizedText !== state.generatedNoteText);
   state.noteHtml = escapeHtml(limitedText);
 }
 
 function syncNoteFromEditor(editor) {
   enforceNoteWordLimit(editor);
+  state.noteDirty = true;
   state.noteHtml = editor.innerHTML;
-  els.generalInfo.value = editor.textContent;
+  els.generalInfo.value = editor.innerText;
   render();
 }
 
@@ -2776,7 +3063,10 @@ function setTemplate(template) {
 }
 
 document.querySelectorAll(".template-tab").forEach((button) => {
-  button.addEventListener("click", () => setTemplate(button.dataset.template));
+  button.addEventListener("click", () => {
+    setTemplate(button.dataset.template);
+    render();
+  });
 });
 
 ["input", "change"].forEach((eventName) => {
