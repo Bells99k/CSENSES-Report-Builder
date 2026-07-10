@@ -1319,18 +1319,12 @@ function comparisonOption(value) {
 function renderComparisonSelected() {
   if (!els.comparisonSelected) return;
   els.comparisonSelected.innerHTML = "";
-  const primaryLocations = new Set(defaultComparisonLocations(comparisonLocationOptions()));
   selectedComparisonLocations().forEach((locationValueToRender) => {
     const option = comparisonOption(locationValueToRender);
     const chip = document.createElement("span");
     chip.className = "comparison-chip";
     const label = document.createElement("span");
     label.textContent = option.display || option.label;
-    if (primaryLocations.has(locationValueToRender)) {
-      chip.append(label);
-      els.comparisonSelected.append(chip);
-      return;
-    }
     const remove = document.createElement("button");
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove ${option.display || option.label}`);
@@ -1352,6 +1346,7 @@ function selectedComparisonLocations() {
   const selected = state.comparisonLocations
     .map((location) => resolvePreferredLocation(location, options))
     .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
+  if (state.comparisonLocationsEdited) return selected.slice(0, 8);
   const defaults = defaultComparisonLocations(options);
   return [...defaults, ...selected.filter((location) => !defaults.includes(location))].slice(0, 8);
 }
