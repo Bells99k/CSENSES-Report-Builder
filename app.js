@@ -88,6 +88,10 @@ const sensorApiMetricByReportMetric = {
   heat: { namespace: "nu", metric: "heat_index", rowKey: "heat" },
   noise: { namespace: "nu", metric: "noise", rowKey: "noise" },
 };
+const defaultSensorFilterIdByMetric = {
+  heat: "25",
+  noise: "25",
+};
 const legacyAqLocationIdByFilterId = {
   "MOD-PM-01486": "15",
   "MOD-PM-01487": "2",
@@ -1047,9 +1051,22 @@ function parseLocationValue(value) {
   return { kind, id, filterId };
 }
 
+function defaultSensorFilterIdForMetric(metric = selectedHazardMetric()) {
+  return defaultSensorFilterIdByMetric[metric] || "";
+}
+
+function defaultPreferredLocationValue() {
+  return defaultSensorFilterIdForMetric() ? "" : "Sample Cluster 1";
+}
+
+function metricChangePreferredLocationValue() {
+  return defaultSensorFilterIdForMetric() ? "" : els.location.value;
+}
+
 function defaultLocationValue(options) {
-  if (selectedHazardMetric() === "noise") {
-    return options.find((option) => option.kind === "sensor" && option.filterId === "2")?.value || options[1]?.value || options[0]?.value || "";
+  const defaultSensorFilterId = defaultSensorFilterIdForMetric();
+  if (defaultSensorFilterId) {
+    return options.find((option) => option.kind === "sensor" && option.filterId === defaultSensorFilterId)?.value || options[0]?.value || "";
   }
   return options[0]?.value || "";
 }
@@ -2394,7 +2411,7 @@ function renderSensorMap() {
   const selected = selectedMappedSensors();
   const metricName = metricDisplay(els.calendarMetric.value);
   const author = els.author.value.trim() || "Name";
-  const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
+  const reportDate = formatReportDate(els.reportDate.value) || currentReportDateLabel();
 
   els.sensorMapTitle.textContent = `${metricName} sensor locations`;
   els.sensorMapMeta.textContent = `Prepared by ${author} on ${reportDate}`;
@@ -2423,13 +2440,39 @@ function formatReportDate(value) {
   return date.toLocaleDateString("en", { month: "long", day: "numeric", year: "numeric" });
 }
 
+function localDateParts(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return { year, month, day };
+}
+
+function currentDateInputValue(date = new Date()) {
+  const { year, month, day } = localDateParts(date);
+  return `${year}-${month}-${day}`;
+}
+
+function currentMonthInputValue(date = new Date()) {
+  const { year, month } = localDateParts(date);
+  return `${year}-${month}`;
+}
+
+function currentReportDateLabel() {
+  return formatReportDate(currentDateInputValue());
+}
+
+function setCurrentPeriodDefaults() {
+  const now = new Date();
+  els.reportDate.value = currentDateInputValue(now);
+  els.month.value = currentMonthInputValue(now);
+}
+
 function loadSampleData() {
   state.rows = sampleRows;
   state.dataSource = "sample";
   if (els.csvUpload) els.csvUpload.value = "";
-  els.month.value = "2026-06";
   setDataStatus("Sample data loaded.", "success");
-  updateClusterOptions("Sample Cluster 1");
+  updateClusterOptions(defaultPreferredLocationValue());
   render();
 }
 
@@ -2900,7 +2943,7 @@ function updateText() {
     : (comparedLocations[0] ? reportLocationDisplay(comparedLocations[0]) : location);
   const catchphrase = els.catchphrase.value.trim() || `What's going on in ${location}?`;
   const author = els.author.value.trim() || "Name";
-  const reportDate = formatReportDate(els.reportDate.value) || "June 24, 2026";
+  const reportDate = formatReportDate(els.reportDate.value) || currentReportDateLabel();
   document.querySelectorAll('[data-bind="title"]').forEach((node) => { node.textContent = title; });
   document.querySelectorAll('[data-bind="monthShort"]').forEach((node) => { node.textContent = info.short; });
   document.getElementById("reportCatchphrasePreview").textContent = catchphrase;
@@ -3073,7 +3116,7 @@ document.querySelectorAll(".template-tab").forEach((button) => {
   [els.title, els.author, els.reportDate, els.catchphrase, els.includeMapPage, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
     input.addEventListener(eventName, () => {
       if (input === els.generalInfo) syncNoteFromTextInput();
-      if (input === els.calendarMetric && eventName === "change") updateClusterOptions(els.location.value);
+      if (input === els.calendarMetric && eventName === "change") updateClusterOptions(metricChangePreferredLocationValue());
       render();
       if (input === els.location || input === els.month || input === els.calendarMetric) updateDataStatusForSelection();
     });
@@ -3204,8 +3247,9 @@ document.getElementById("printBtn").addEventListener("click", async () => {
   window.print();
 });
 
-loadSampleData();
+setCurrentPeriodDefaults();
 state.sensorCatalog = builtInSensorCatalog;
+loadSampleData();
 preloadPictureAssets();
 setTemplate(state.template);
 loadSensorCatalog().then(() => {
