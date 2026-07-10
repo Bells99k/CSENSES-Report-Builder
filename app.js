@@ -12,6 +12,7 @@ const state = {
   sensorPrintMapRenderId: 0,
   apiLoadId: 0,
   apiAbortController: null,
+  comparisonLocationsEdited: false,
   noteHtml: "",
   noteDirty: false,
   generatedNoteText: "",
@@ -89,6 +90,8 @@ const sensorApiMetricByReportMetric = {
   noise: { namespace: "nu", metric: "noise", rowKey: "noise" },
 };
 const defaultSensorFilterIdByMetric = {
+  air: "MOD-PM-01492",
+  pm10: "MOD-PM-01492",
   heat: "25",
   noise: "25",
 };
@@ -468,7 +471,7 @@ const metricStandards = {
   },
   heat: {
     title: "Heat Index",
-    note: "Heat Index colors use daily cluster averages and follow the HI thresholds: <80°F, 80-90°F, 90-103°F, 103-124°F, and 125°F+.",
+    note: "Heat Index colors use daily cluster averages and follow NOAA's NWS HI thresholds: <80°F, 80-90°F, 90-103°F, 103-124°F, and 125°F+.",
     bands: heatIndexBands.map((band) => ({
       label: band.label,
       detail: band.label === "No HI Classification" ? "Less than 80°F" :
@@ -1072,7 +1075,6 @@ function defaultLocationValue(options) {
 }
 
 function updateClusterOptions(preferredCluster = els.location.value) {
-  const clusters = clusterOptions();
   const options = locationOptions();
   populateClusterSelect(els.location, options);
 
@@ -1080,8 +1082,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   if (!selectedValue) return;
   els.location.value = selectedValue;
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
-  const selected = selectedLocation(selectedValue);
-  updateComparisonLocationOptions(clusters, selected.kind === "cluster" ? selected.filterId : clusters[0]);
+  updateComparisonLocationOptions(selectedValue);
   if (els.sensorSearch.value.trim()) renderSensorSearchResults();
   if (els.comparisonSearch?.value.trim()) renderComparisonSearchResults();
 }
@@ -1180,7 +1181,7 @@ function searchLocationOptions() {
 
 function matchingComparisonOptions(query) {
   const normalizedQuery = query.trim().toLowerCase();
-  const selected = new Set(state.comparisonLocations);
+  const selected = new Set(selectedComparisonLocations());
   return comparisonLocationOptions().filter((option) => {
     if (selected.has(option.value)) return false;
     const searchable = `${option.label} ${option.display} ${option.value}`.toLowerCase();
@@ -1196,6 +1197,7 @@ function addComparisonLocation(value) {
   if (!state.comparisonLocations.includes(value)) {
     state.comparisonLocations = [...state.comparisonLocations, value].slice(-8);
   }
+  state.comparisonLocationsEdited = true;
   els.comparisonSearch.value = "";
   hideComparisonSearchResults();
   renderComparisonSelected();
@@ -1241,17 +1243,26 @@ function addFirstComparisonSearchResult() {
   if (match) addComparisonLocation(match.value);
 }
 
-function updateComparisonLocationOptions(clusters, primaryCluster = els.location.value) {
+function primaryComparisonLocationValue(options, primaryLocation = els.location.value) {
+  return resolvePreferredLocation(primaryLocation, options) || options[0]?.value || "";
+}
+
+function defaultComparisonLocations(options, primaryLocation = els.location.value) {
+  const primaryValue = primaryComparisonLocationValue(options, primaryLocation);
+  return primaryValue ? [primaryValue] : [];
+}
+
+function updateComparisonLocationOptions(primaryLocation = els.location.value) {
   const options = comparisonLocationOptions();
   const optionValues = new Set(options.map((option) => option.value));
   const previous = state.comparisonLocations
     .map((location) => resolvePreferredLocation(location, options))
     .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
-  const primaryValue = resolvePreferredLocation(primaryCluster, options);
-  const defaults = [primaryValue, ...options.map((option) => option.value)]
-    .filter((location, index, all) => location && all.indexOf(location) === index)
-    .slice(0, Math.min(4, options.length));
-  state.comparisonLocations = previous.length ? previous : defaults;
+  const defaults = defaultComparisonLocations(options, primaryLocation);
+  const next = state.comparisonLocationsEdited
+    ? [...defaults, ...previous.filter((location) => !defaults.includes(location))]
+    : defaults;
+  state.comparisonLocations = next.slice(0, 8);
   renderComparisonLocationOptions();
 }
 
@@ -1293,21 +1304,25 @@ function comparisonOption(value) {
 function renderComparisonSelected() {
   if (!els.comparisonSelected) return;
   els.comparisonSelected.innerHTML = "";
+  const primaryLocations = new Set(defaultComparisonLocations(comparisonLocationOptions()));
   selectedComparisonLocations().forEach((locationValueToRender) => {
     const option = comparisonOption(locationValueToRender);
     const chip = document.createElement("span");
     chip.className = "comparison-chip";
     const label = document.createElement("span");
     label.textContent = option.display || option.label;
+    if (primaryLocations.has(locationValueToRender)) {
+      chip.append(label);
+      els.comparisonSelected.append(chip);
+      return;
+    }
     const remove = document.createElement("button");
     remove.type = "button";
     remove.setAttribute("aria-label", `Remove ${option.display || option.label}`);
     remove.textContent = "x";
     remove.addEventListener("click", () => {
+      state.comparisonLocationsEdited = true;
       state.comparisonLocations = state.comparisonLocations.filter((location) => location !== locationValueToRender);
-      if (!state.comparisonLocations.length) {
-        state.comparisonLocations = comparisonLocationOptions().slice(0, 1).map((item) => item.value);
-      }
       renderComparisonSelected();
       render();
     });
@@ -1322,8 +1337,8 @@ function selectedComparisonLocations() {
   const selected = state.comparisonLocations
     .map((location) => resolvePreferredLocation(location, options))
     .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
-  if (selected.length) return selected;
-  return options.slice(0, Math.min(4, options.length)).map((option) => option.value);
+  const defaults = defaultComparisonLocations(options);
+  return [...defaults, ...selected.filter((location) => !defaults.includes(location))].slice(0, 8);
 }
 
 function comparisonSeries() {
@@ -2471,7 +2486,7 @@ function loadSampleData() {
   state.rows = sampleRows;
   state.dataSource = "sample";
   if (els.csvUpload) els.csvUpload.value = "";
-  setDataStatus("Sample data loaded.", "success");
+  setDataStatus("Load data using the button above", "neutral");
   updateClusterOptions(defaultPreferredLocationValue());
   render();
 }
@@ -3117,6 +3132,7 @@ document.querySelectorAll(".template-tab").forEach((button) => {
     input.addEventListener(eventName, () => {
       if (input === els.generalInfo) syncNoteFromTextInput();
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(metricChangePreferredLocationValue());
+      if (input === els.location && eventName === "change") updateComparisonLocationOptions(els.location.value);
       render();
       if (input === els.location || input === els.month || input === els.calendarMetric) updateDataStatusForSelection();
     });
