@@ -828,6 +828,21 @@ function metricDisplay(metric) {
   }[metric] || "Sensor reading";
 }
 
+function metricDisplayHtml(metric) {
+  return {
+    air: "PM<sub>2.5</sub>",
+    pm10: "PM<sub>10</sub>",
+    heat: "Heat Index",
+    noise: "Noise",
+  }[metric] || "Sensor reading";
+}
+
+function metricTextHtml(value) {
+  return escapeHtml(value)
+    .replace(/PM2\.5/g, "PM<sub>2.5</sub>")
+    .replace(/PM10/g, "PM<sub>10</sub>");
+}
+
 function filteredRows() {
   const { year, month } = monthInfo();
   const prefix = `${year}-${String(month).padStart(2, "0")}`;
@@ -1525,7 +1540,7 @@ function renderStandards(metric) {
   const standard = metricStandards[metric] || metricStandards.composite;
   const renderStandard = { ...standard, metric };
   const title = document.getElementById("standardsTitle");
-  if (title) title.textContent = renderStandard.title;
+  if (title) title.innerHTML = metricTextHtml(renderStandard.title);
   renderStandardsGraphic(document.getElementById("standardsGraphic"), renderStandard);
   renderStandardsGraphic(document.getElementById("comparisonStandardsGraphic"), renderStandard);
 }
@@ -1547,7 +1562,7 @@ function renderCalendar() {
   const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
   els.calendarGrid.innerHTML = "";
   renderStandards(metric);
-  document.getElementById("heatmapNote").textContent = (metricStandards[metric] || metricStandards.composite).note;
+  document.getElementById("heatmapNote").innerHTML = metricTextHtml((metricStandards[metric] || metricStandards.composite).note);
 
   weekdays.forEach((day) => {
     const item = document.createElement("div");
@@ -1850,7 +1865,7 @@ function updateTrendTooltip(event) {
   const date = new Date(info.year, info.month - 1, day).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
   tooltip.innerHTML = `
     <strong>${date}</strong>
-    <span>${escapeHtml(metricDisplay(metric))}</span>
+    <span>${metricDisplayHtml(metric)}</span>
     ${values.map((item) => `
       <div class="tooltip-row">
         <i style="background:${item.color}"></i>
@@ -2424,11 +2439,10 @@ function renderSensorMap() {
 
   const sensors = mappedSensorsForMetric();
   const selected = selectedMappedSensors();
-  const metricName = metricDisplay(els.calendarMetric.value);
   const author = els.author.value.trim() || "Name";
   const reportDate = formatReportDate(els.reportDate.value) || currentReportDateLabel();
 
-  els.sensorMapTitle.textContent = `${metricName} sensor locations`;
+  els.sensorMapTitle.innerHTML = `${metricDisplayHtml(els.calendarMetric.value)} sensor locations`;
   els.sensorMapMeta.textContent = `Prepared by ${author} on ${reportDate}`;
 
   const selectedIds = updateSensorMapDetails(sensors, selected);
@@ -2739,7 +2753,7 @@ async function loadApiData() {
 
 function updateComparisonSummary() {
   const metric = els.calendarMetric.value;
-  const metricName = metricDisplay(metric);
+  const metricNameHtml = metricDisplayHtml(metric);
   const unit = metricUnit(metric);
   const series = comparisonSeries();
   const withPeaks = series.filter((item) => item.peak !== null);
@@ -2748,9 +2762,9 @@ function updateComparisonSummary() {
   const average = withAverages.sort((a, b) => b.average - a.average)[0];
   const comparedDays = Math.max(0, ...series.map((item) => item.values.length));
 
-  document.getElementById("comparisonMetricTitle").textContent = `${metricName} by Location`;
-  document.getElementById("comparisonPeakLabel").textContent = `Highest daily average ${metricName}`;
-  document.getElementById("comparisonAverageLabel").textContent = `Highest monthly average ${metricName}`;
+  document.getElementById("comparisonMetricTitle").innerHTML = `${metricNameHtml} by Location`;
+  document.getElementById("comparisonPeakLabel").innerHTML = `Highest daily average ${metricNameHtml}`;
+  document.getElementById("comparisonAverageLabel").innerHTML = `Highest monthly average ${metricNameHtml}`;
   document.getElementById("comparisonPeakLocation").textContent = peak ? `${peak.cluster}: ${peak.peak} ${unit}` : "--";
   document.getElementById("comparisonAverageLocation").textContent = average ? `${average.cluster}: ${average.average} ${unit}` : "--";
   document.getElementById("comparisonCoverage").textContent = series.length ? `${series.length} locations / ${comparedDays} days` : "--";
@@ -2992,12 +3006,12 @@ function updateText() {
   document.getElementById("snapshotNotes").textContent = userNote || defaultNoteText;
 
   const selectedMetric = els.calendarMetric.value;
-  const selectedMetricName = metricDisplay(selectedMetric);
+  const selectedMetricNameHtml = metricDisplayHtml(selectedMetric);
   const selectedMetricUnit = metricUnit(selectedMetric);
   const selectedMetricStats = metricSummaryStats(stats.rows, selectedMetric);
-  document.getElementById("metricSummaryLabel").textContent = `${selectedMetricName} exceedance days for ${info.short}.`;
-  document.getElementById("peakMetricSummaryLabel").textContent = `Highest daily average ${selectedMetricName} for ${info.short}.`;
-  document.getElementById("riskMetricSummaryLabel").textContent = `Most common ${selectedMetricName} standard category for ${info.short}.`;
+  document.getElementById("metricSummaryLabel").innerHTML = `${selectedMetricNameHtml} exceedance days for ${escapeHtml(info.short)}.`;
+  document.getElementById("peakMetricSummaryLabel").innerHTML = `Highest daily average ${selectedMetricNameHtml} for ${escapeHtml(info.short)}.`;
+  document.getElementById("riskMetricSummaryLabel").innerHTML = `Most common ${selectedMetricNameHtml} standard category for ${escapeHtml(info.short)}.`;
   document.getElementById("heatSummary").textContent = plural(selectedMetricStats.exceedanceDays, "exceedance day");
   document.getElementById("peakHeatSummary").textContent = selectedMetricStats.maxValue === null ? "--" : `${selectedMetricStats.maxValue} ${selectedMetricUnit}`;
   document.getElementById("dangerHeatSummary").textContent = selectedMetricStats.topBand ? `${selectedMetricStats.topBand.label}: ${plural(selectedMetricStats.topBand.count, "day")}` : "--";

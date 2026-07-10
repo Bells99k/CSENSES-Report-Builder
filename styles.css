@@ -1065,6 +1065,12 @@ textarea {
   line-height: 0;
 }
 
+.template sub,
+.map-page sub {
+  font-size: 0.68em;
+  line-height: 0;
+}
+
 .empty-note {
   color: var(--muted);
   font-style: italic;
