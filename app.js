@@ -1818,7 +1818,7 @@ function renderTrendChart() {
     ctx.fillStyle = colors.muted;
     ctx.font = "24px Inter, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Load sensor data or sample data", width / 2, height / 2);
+    ctx.fillText("Load sensor data", width / 2, height / 2);
     ctx.textAlign = "start";
   }
 }
@@ -2498,11 +2498,6 @@ function loadSampleData() {
   setDataStatus("Load data using the button above", "neutral");
   updateClusterOptions(defaultPreferredLocationValue());
   render();
-}
-
-function clearUploadedData() {
-  if (state.dataSource !== "uploaded" && state.dataSource !== "api") return;
-  loadSampleData();
 }
 
 function updateDataStatusForSelection() {
@@ -3255,14 +3250,6 @@ els.csvUpload?.addEventListener("change", () => {
 
 els.loadApiBtn?.addEventListener("click", () => {
   loadApiData();
-});
-
-document.getElementById("loadSampleBtn")?.addEventListener("click", () => {
-  loadSampleData();
-});
-
-document.getElementById("clearDataBtn")?.addEventListener("click", () => {
-  clearUploadedData();
 });
 
 document.getElementById("printBtn").addEventListener("click", async () => {
