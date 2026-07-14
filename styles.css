@@ -210,6 +210,13 @@ textarea {
   padding: 9px 10px;
 }
 
+input.is-invalid,
+select.is-invalid,
+textarea.is-invalid {
+  border-color: var(--coral);
+  box-shadow: 0 0 0 3px rgba(196, 95, 78, 0.18);
+}
+
 .sensor-search {
   position: relative;
   display: grid;
@@ -284,7 +291,16 @@ textarea {
   font-size: 0.84rem;
 }
 
+.custom-cluster-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .data-status {
+  min-height: 1.2em;
+  font-weight: 750;
+}
+
+.custom-cluster-status {
   min-height: 1.2em;
   font-weight: 750;
 }
@@ -294,6 +310,14 @@ textarea {
 }
 
 .data-status.is-success {
+  color: var(--teal);
+}
+
+.custom-cluster-status.is-error {
+  color: var(--coral);
+}
+
+.custom-cluster-status.is-success {
   color: var(--teal);
 }
 
