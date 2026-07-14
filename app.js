@@ -93,6 +93,7 @@ const noteWordLimit = 100;
 const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
 const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
 const mapTileBaseUrl = "https://a.basemaps.cartocdn.com/light_all";
+const apiRequestTimeoutMs = 90000;
 const sensorApiMetricByReportMetric = {
   air: { namespace: "aq", metric: "pm25", rowKey: "air" },
   pm10: { namespace: "aq", metric: "pm10", rowKey: "pm10" },
@@ -2834,7 +2835,7 @@ async function loadApiData() {
   state.apiLoadId = loadId;
   if (state.apiAbortController) state.apiAbortController.abort();
   state.apiAbortController = new AbortController();
-  const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), 20000);
+  const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), apiRequestTimeoutMs);
 
   const metric = els.calendarMetric.value;
   const apiConfig = sensorApiConfigForReportMetric(metric);
@@ -2862,36 +2863,53 @@ async function loadApiData() {
   setDataStatus(`Loading ${metricDisplay(metric)} for ${selections.length} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
 
   try {
-    const loaded = [];
-    for (const selection of selections) {
-      const result = await fetchRowsForSelection(selection, {
+    const results = await Promise.allSettled(selections.map((selection) => {
+      return fetchRowsForSelection(selection, {
         apiConfig,
         start,
         end,
         aggregation,
         signal: state.apiAbortController.signal,
-      });
-      if (loadId !== state.apiLoadId) return;
-      if (!result.rows.length) {
+      }).then((result) => ({ selection, ...result }));
+    }));
+
+    if (loadId !== state.apiLoadId) return;
+
+    const loaded = [];
+    const failed = [];
+    let emptyCount = 0;
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        failed.push({ selection: selections[index], error: result.reason });
+        return;
+      }
+
+      const item = result.value;
+      if (!item.rows.length) {
+        emptyCount += 1;
         console.info("CSENSES API returned no usable rows", {
-          location: selection.display || selection.label,
+          location: item.selection.display || item.selection.label,
           metric,
           start,
           end,
         });
-        continue;
+        return;
       }
-      mergeLoadedRows(result.rows, {
-        selection,
+
+      mergeLoadedRows(item.rows, {
+        selection: item.selection,
         metric,
         startDate: start,
         endDate: end,
       });
-      loaded.push({ selection, ...result });
-    }
+      loaded.push(item);
+    });
 
     if (!loaded.length) {
-      throw new Error(`No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
+      const abortError = failed.find((item) => item.error?.name === "AbortError")?.error;
+      if (abortError) throw abortError;
+      const firstError = failed.find((item) => item.error)?.error;
+      throw new Error(firstError?.message || `No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
     }
 
     state.dataSource = "api";
@@ -2902,12 +2920,14 @@ async function loadApiData() {
     const totalRows = loaded.reduce((sum, item) => sum + item.rows.length, 0);
     const dateSpans = loaded.map((item) => apiLoadedDateSpan(item.rows)).filter(Boolean);
     const dateSpan = dateSpans.length ? dateSpans[0] : `${start} to ${end}`;
-    setDataStatus(`Loaded ${totalRows} ${aggregation} readings for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).`, "success");
+    const skipped = failed.length + emptyCount;
+    const skippedNote = skipped ? ` ${skipped} location${skipped === 1 ? "" : "s"} had no usable data or could not be loaded.` : "";
+    setDataStatus(`Loaded ${totalRows} ${aggregation} readings for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).${skippedNote}`, "success");
     render();
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
     const message = error.name === "AbortError"
-      ? "API request timed out. Try again, or use 1 day aggregation for a smaller response."
+      ? "Sensor data loading timed out. Try fewer sensors, another month, or try again in a moment."
       : (error.message || "Could not load API data.");
     setDataStatus(message, "error");
   } finally {
