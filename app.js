@@ -2077,16 +2077,8 @@ function renderScene(canvas) {
   }
 
   const gradient = ctx.createLinearGradient(0, 0, width, height);
-  if (state.imageChoice === "school") {
-    gradient.addColorStop(0, "#8fb7a1");
-    gradient.addColorStop(1, "#f3dba5");
-  } else if (state.imageChoice === "transit") {
-    gradient.addColorStop(0, "#6d8794");
-    gradient.addColorStop(1, "#c45f4e");
-  } else {
-    gradient.addColorStop(0, "#9fb5bd");
-    gradient.addColorStop(1, "#f2b9ad");
-  }
+  gradient.addColorStop(0, "#9fb5bd");
+  gradient.addColorStop(1, "#f2b9ad");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
@@ -2115,8 +2107,7 @@ function renderScene(canvas) {
 
   ctx.fillStyle = "#181b1f";
   ctx.font = `700 ${Math.max(20, width * 0.035)}px Inter, sans-serif`;
-  const label = state.imageChoice === "school" ? "Schoolyard Sensor" : state.imageChoice === "transit" ? "Transit Stop Monitor" : "Urban Heat Corridor";
-  ctx.fillText(label, width * 0.06, height * 0.88);
+  ctx.fillText("Grove Hall Sensor", width * 0.06, height * 0.88);
 }
 
 function sensorKind(sensor) {
