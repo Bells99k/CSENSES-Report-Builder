@@ -15,6 +15,7 @@ const state = {
   comparisonLocationsEdited: false,
   customClusters: [],
   customClusterDraftSensors: [],
+  comparisonClusterDraftSensors: [],
   customClusterCounter: 1,
   noteHtml: "",
   noteDirty: false,
@@ -52,6 +53,13 @@ const els = {
   customClusterCreateBtn: document.getElementById("customClusterCreateBtn"),
   customClusterSelected: document.getElementById("customClusterSelected"),
   customClusterStatus: document.getElementById("customClusterStatus"),
+  comparisonMode: document.getElementById("comparisonMode"),
+  comparisonClusterName: document.getElementById("comparisonClusterName"),
+  comparisonClusterSelect: document.getElementById("comparisonClusterSelect"),
+  comparisonClusterAddBtn: document.getElementById("comparisonClusterAddBtn"),
+  comparisonClusterCreateBtn: document.getElementById("comparisonClusterCreateBtn"),
+  comparisonClusterSelected: document.getElementById("comparisonClusterSelected"),
+  comparisonClusterStatus: document.getElementById("comparisonClusterStatus"),
   comparisonSearch: document.getElementById("comparisonSearch"),
   comparisonSearchBtn: document.getElementById("comparisonSearchBtn"),
   comparisonSearchResults: document.getElementById("comparisonSearchResults"),
@@ -1141,7 +1149,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   els.location.value = selectedValue;
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
   updateComparisonLocationOptions(selectedValue);
-  renderCustomClusterBuilder();
+  renderCustomClusterBuilders();
   if (els.sensorSearch.value.trim()) renderSensorSearchResults();
   if (els.comparisonSearch?.value.trim()) renderComparisonSearchResults();
 }
@@ -1168,17 +1176,42 @@ function customClusterSensorOptions() {
   return sensorLocationOptions();
 }
 
-function setCustomClusterStatus(message = "", tone = "neutral") {
-  if (!els.customClusterStatus) return;
-  els.customClusterStatus.textContent = message;
-  els.customClusterStatus.classList.toggle("is-error", tone === "error");
-  els.customClusterStatus.classList.toggle("is-success", tone === "success");
+function clusterBuilderConfig(context = "composite") {
+  if (context === "trends") {
+    return {
+      draftKey: "comparisonClusterDraftSensors",
+      name: els.comparisonClusterName,
+      select: els.comparisonClusterSelect,
+      addBtn: els.comparisonClusterAddBtn,
+      createBtn: els.comparisonClusterCreateBtn,
+      selected: els.comparisonClusterSelected,
+      status: els.comparisonClusterStatus,
+    };
+  }
+  return {
+    draftKey: "customClusterDraftSensors",
+    name: els.customClusterName,
+    select: els.customClusterSelect,
+    addBtn: els.customClusterAddBtn,
+    createBtn: els.customClusterCreateBtn,
+    selected: els.customClusterSelected,
+    status: els.customClusterStatus,
+  };
 }
 
-function setCustomClusterNameError(hasError) {
-  if (!els.customClusterName) return;
-  els.customClusterName.classList.toggle("is-invalid", hasError);
-  els.customClusterName.setAttribute("aria-invalid", String(hasError));
+function setCustomClusterStatus(context = "composite", message = "", tone = "neutral") {
+  const { status } = clusterBuilderConfig(context);
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("is-error", tone === "error");
+  status.classList.toggle("is-success", tone === "success");
+}
+
+function setCustomClusterNameError(context = "composite", hasError) {
+  const { name } = clusterBuilderConfig(context);
+  if (!name) return;
+  name.classList.toggle("is-invalid", hasError);
+  name.setAttribute("aria-invalid", String(hasError));
 }
 
 function renderGroupedOptions(select, options, placeholder) {
@@ -1204,22 +1237,23 @@ function renderGroupedOptions(select, options, placeholder) {
   });
 }
 
-function renderCustomClusterBuilder() {
-  if (!els.customClusterSelect || !els.customClusterSelected) return;
+function renderCustomClusterBuilder(context = "composite") {
+  const config = clusterBuilderConfig(context);
+  if (!config.select || !config.selected) return;
   const options = customClusterSensorOptions();
   const optionValues = new Set(options.map((option) => option.value));
-  state.customClusterDraftSensors = state.customClusterDraftSensors
+  state[config.draftKey] = state[config.draftKey]
     .filter((value, index, all) => optionValues.has(value) && all.indexOf(value) === index);
 
-  const selectedValues = new Set(state.customClusterDraftSensors);
+  const selectedValues = new Set(state[config.draftKey]);
   renderGroupedOptions(
-    els.customClusterSelect,
+    config.select,
     options.filter((option) => !selectedValues.has(option.value)),
     "Choose a sensor",
   );
 
-  els.customClusterSelected.innerHTML = "";
-  state.customClusterDraftSensors.forEach((sensorValue) => {
+  config.selected.innerHTML = "";
+  state[config.draftKey].forEach((sensorValue) => {
     const option = selectedLocation(sensorValue);
     const chip = document.createElement("span");
     chip.className = "comparison-chip";
@@ -1230,48 +1264,55 @@ function renderCustomClusterBuilder() {
     remove.setAttribute("aria-label", `Remove ${option.display || option.label}`);
     remove.textContent = "x";
     remove.addEventListener("click", () => {
-      state.customClusterDraftSensors = state.customClusterDraftSensors.filter((value) => value !== sensorValue);
-      renderCustomClusterBuilder();
+      state[config.draftKey] = state[config.draftKey].filter((value) => value !== sensorValue);
+      renderCustomClusterBuilder(context);
     });
     chip.append(label, remove);
-    els.customClusterSelected.append(chip);
+    config.selected.append(chip);
   });
 
-  const name = cleanText(els.customClusterName?.value || "");
-  const canAddSensor = Boolean(els.customClusterSelect.options.length > 1);
-  if (name) setCustomClusterNameError(false);
-  if (els.customClusterAddBtn) els.customClusterAddBtn.disabled = !canAddSensor;
-  if (els.customClusterCreateBtn) els.customClusterCreateBtn.disabled = false;
-  if (!state.customClusterDraftSensors.length) {
-    setCustomClusterStatus("Select at least two sensors to create a cluster.");
+  const name = cleanText(config.name?.value || "");
+  const canAddSensor = Boolean(config.select.options.length > 1);
+  if (name) setCustomClusterNameError(context, false);
+  if (config.addBtn) config.addBtn.disabled = !canAddSensor;
+  if (config.createBtn) config.createBtn.disabled = false;
+  if (!state[config.draftKey].length) {
+    setCustomClusterStatus(context, "Select at least two sensors to create a cluster.");
   } else {
-    setCustomClusterStatus(`${plural(state.customClusterDraftSensors.length, "sensor")} selected.`);
+    setCustomClusterStatus(context, `${plural(state[config.draftKey].length, "sensor")} selected.`);
   }
 }
 
-function addCustomClusterDraftSensor() {
-  const value = els.customClusterSelect?.value || "";
-  if (!value || state.customClusterDraftSensors.includes(value)) return;
-  state.customClusterDraftSensors = [...state.customClusterDraftSensors, value];
-  if (els.customClusterSelect) els.customClusterSelect.value = "";
-  renderCustomClusterBuilder();
+function renderCustomClusterBuilders() {
+  renderCustomClusterBuilder("composite");
+  renderCustomClusterBuilder("trends");
 }
 
-function createCustomCluster() {
-  const name = cleanText(els.customClusterName?.value || "");
+function addCustomClusterDraftSensor(context = "composite") {
+  const config = clusterBuilderConfig(context);
+  const value = config.select?.value || "";
+  if (!value || state[config.draftKey].includes(value)) return;
+  state[config.draftKey] = [...state[config.draftKey], value];
+  if (config.select) config.select.value = "";
+  renderCustomClusterBuilder(context);
+}
+
+function createCustomCluster(context = "composite") {
+  const config = clusterBuilderConfig(context);
+  const name = cleanText(config.name?.value || "");
   const missingName = !name;
-  const missingSensors = state.customClusterDraftSensors.length < 2;
-  setCustomClusterNameError(missingName);
+  const missingSensors = state[config.draftKey].length < 2;
+  setCustomClusterNameError(context, missingName);
 
   if (missingName || missingSensors) {
     if (missingName && missingSensors) {
-      setCustomClusterStatus("Enter a sensor cluster name and select at least two sensors.", "error");
+      setCustomClusterStatus(context, "Enter a sensor cluster name and select at least two sensors.", "error");
     } else if (missingName) {
-      setCustomClusterStatus("Enter a sensor cluster name.", "error");
+      setCustomClusterStatus(context, "Enter a sensor cluster name.", "error");
     } else {
-      setCustomClusterStatus("Select at least two sensors to create a cluster.", "error");
+      setCustomClusterStatus(context, "Select at least two sensors to create a cluster.", "error");
     }
-    if (missingName) els.customClusterName?.focus();
+    if (missingName) config.name?.focus();
     return;
   }
 
@@ -1279,17 +1320,29 @@ function createCustomCluster() {
     id: `custom-${state.customClusterCounter++}`,
     name,
     metric: els.calendarMetric.value,
-    members: [...state.customClusterDraftSensors],
+    members: [...state[config.draftKey]],
   };
   state.customClusters = [...state.customClusters, cluster];
-  state.customClusterDraftSensors = [];
-  if (els.customClusterName) els.customClusterName.value = "";
-  setCustomClusterNameError(false);
+  state[config.draftKey] = [];
+  if (config.name) config.name.value = "";
+  setCustomClusterNameError(context, false);
 
   const customValue = locationValue("custom", cluster.id);
+  if (context === "trends") {
+    state.comparisonLocationsEdited = true;
+    if (!state.comparisonLocations.includes(customValue)) {
+      state.comparisonLocations = [...state.comparisonLocations, customValue].slice(-8);
+    }
+    renderComparisonLocationOptions();
+    render();
+    renderCustomClusterBuilder("trends");
+    setCustomClusterStatus(context, `Created ${name} and added it to comparisons.`, "success");
+    return;
+  }
+
   updateClusterOptions(customValue);
   render();
-  setCustomClusterStatus(`Created ${name}.`, "success");
+  setCustomClusterStatus(context, `Created ${name}.`, "success");
 }
 
 function matchingLocationOptions(query) {
@@ -3305,6 +3358,14 @@ function syncLocationModeControls() {
   if (mode !== "existing") hideSensorSearchResults();
 }
 
+function syncComparisonModeControls() {
+  const mode = els.comparisonMode?.value || "existing";
+  document.querySelectorAll("[data-comparison-mode]").forEach((control) => {
+    control.hidden = state.template !== "trends" || control.dataset.comparisonMode !== mode;
+  });
+  if (mode !== "existing") hideComparisonSearchResults();
+}
+
 function setTemplate(template) {
   state.template = template;
   if (template !== "trends") hideTrendTooltip();
@@ -3320,6 +3381,7 @@ function setTemplate(template) {
     control.hidden = control.dataset.templateControl !== template;
   });
   syncLocationModeControls();
+  syncComparisonModeControls();
 }
 
 document.querySelectorAll(".template-tab").forEach((button) => {
@@ -3343,7 +3405,12 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 
 els.locationMode?.addEventListener("change", () => {
   syncLocationModeControls();
-  renderCustomClusterBuilder();
+  renderCustomClusterBuilder("composite");
+});
+
+els.comparisonMode?.addEventListener("change", () => {
+  syncComparisonModeControls();
+  renderCustomClusterBuilder("trends");
 });
 
 setupNoteEditor({
@@ -3386,21 +3453,39 @@ els.sensorSearch.addEventListener("keydown", (event) => {
 els.location.addEventListener("change", hideSensorSearchResults);
 
 els.customClusterAddBtn?.addEventListener("click", () => {
-  addCustomClusterDraftSensor();
+  addCustomClusterDraftSensor("composite");
 });
 
 els.customClusterSelect?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
-  addCustomClusterDraftSensor();
+  addCustomClusterDraftSensor("composite");
 });
 
 els.customClusterName?.addEventListener("input", () => {
-  renderCustomClusterBuilder();
+  renderCustomClusterBuilder("composite");
 });
 
 els.customClusterCreateBtn?.addEventListener("click", () => {
-  createCustomCluster();
+  createCustomCluster("composite");
+});
+
+els.comparisonClusterAddBtn?.addEventListener("click", () => {
+  addCustomClusterDraftSensor("trends");
+});
+
+els.comparisonClusterSelect?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  addCustomClusterDraftSensor("trends");
+});
+
+els.comparisonClusterName?.addEventListener("input", () => {
+  renderCustomClusterBuilder("trends");
+});
+
+els.comparisonClusterCreateBtn?.addEventListener("click", () => {
+  createCustomCluster("trends");
 });
 
 els.comparisonSearchBtn.addEventListener("click", () => {

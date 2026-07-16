@@ -113,7 +113,14 @@
           </div>
           <div class="field-group" data-template-control="trends" hidden>
             <p class="field-label">Comparison locations</p>
-            <div class="comparison-picker">
+            <label class="comparison-select-label">
+              Comparison selection
+              <select id="comparisonMode">
+                <option value="existing">Add sensor locations or clusters</option>
+                <option value="custom">Create your own sensor cluster</option>
+              </select>
+            </label>
+            <div class="comparison-picker" data-comparison-mode="existing">
               <label class="comparison-select-label">
                 Add from sensor list
                 <select id="comparisonSelect">
@@ -125,8 +132,27 @@
                 <button id="comparisonSearchBtn" type="button">Add</button>
                 <div id="comparisonSearchResults" class="sensor-search-results" role="listbox" hidden></div>
               </div>
-              <div id="comparisonSelected" class="comparison-selected" aria-label="Selected comparison locations"></div>
             </div>
+            <div class="field-group custom-cluster-builder" data-comparison-mode="custom" hidden>
+              <p class="field-label">Create your own sensor cluster</p>
+              <label class="comparison-select-label">
+                Cluster name
+                <input id="comparisonClusterName" type="text" placeholder="e.g., Blue Hill Ave Sensors" aria-describedby="comparisonClusterStatus">
+              </label>
+              <label class="comparison-select-label">
+                Add sensors
+                <select id="comparisonClusterSelect">
+                  <option value="">Choose a sensor</option>
+                </select>
+              </label>
+              <div class="data-actions custom-cluster-actions">
+                <button id="comparisonClusterAddBtn" type="button">Add sensor</button>
+                <button id="comparisonClusterCreateBtn" type="button">Create cluster</button>
+              </div>
+              <div id="comparisonClusterSelected" class="comparison-selected" aria-label="Selected comparison cluster sensors"></div>
+              <p class="hint custom-cluster-status" id="comparisonClusterStatus" aria-live="polite"></p>
+            </div>
+            <div id="comparisonSelected" class="comparison-selected" aria-label="Selected comparison locations"></div>
             <div id="comparisonLocations" class="check-list" aria-label="Comparison locations" hidden></div>
           </div>
         </section>
