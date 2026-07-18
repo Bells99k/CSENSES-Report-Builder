@@ -34,6 +34,9 @@ const els = {
   generalInfo: document.getElementById("generalInfo"),
   notePreview: document.getElementById("generalInfoPreview"),
   pictureSelect: document.getElementById("pictureSelect"),
+  pictureSearch: document.getElementById("pictureSearch"),
+  pictureSearchBtn: document.getElementById("pictureSearchBtn"),
+  pictureSearchStatus: document.getElementById("pictureSearchStatus"),
   imageUpload: document.getElementById("imageUpload"),
   csvUpload: document.getElementById("csvUpload"),
   airThreshold: document.getElementById("airThreshold"),
@@ -3517,6 +3520,39 @@ els.pictureSelect.addEventListener("change", () => {
   state.uploadedImage = null;
   els.imageUpload.value = "";
   render();
+});
+
+const pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
+  value: option.value,
+  label: option.textContent,
+}));
+
+function searchPictures() {
+  const query = els.pictureSearch.value.trim().toLocaleLowerCase();
+  const matches = pictureOptions.filter(({ label }) => label.toLocaleLowerCase().includes(query));
+  const selectedValue = els.pictureSelect.value;
+
+  els.pictureSelect.replaceChildren(...matches.map(({ value, label }) => new Option(label, value)));
+  if (matches.some(({ value }) => value === selectedValue)) els.pictureSelect.value = selectedValue;
+
+  if (!query) {
+    els.pictureSearchStatus.textContent = "";
+  } else if (matches.length) {
+    els.pictureSearchStatus.textContent = `${matches.length} picture${matches.length === 1 ? "" : "s"} found.`;
+  } else {
+    els.pictureSearchStatus.textContent = `No pictures found for “${els.pictureSearch.value.trim()}”.`;
+  }
+}
+
+els.pictureSearchBtn?.addEventListener("click", searchPictures);
+els.pictureSearch?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    searchPictures();
+  } else if (event.key === "Escape") {
+    els.pictureSearch.value = "";
+    searchPictures();
+  }
 });
 
 els.imageUpload.addEventListener("change", () => {

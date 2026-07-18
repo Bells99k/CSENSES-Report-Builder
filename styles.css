@@ -269,6 +269,11 @@ textarea.is-invalid {
   color: var(--muted);
 }
 
+.picture-search-status {
+  min-height: 1.25em;
+  margin-top: 5px;
+}
+
 .comparison-picker {
   display: grid;
   gap: 8px;

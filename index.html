@@ -179,6 +179,11 @@
               <option value="grove">Grove Hall sensor</option>
             </select>
           </label>
+          <div class="sensor-search picture-search" role="search">
+            <input id="pictureSearch" type="search" placeholder="Search by sensor location" autocomplete="off" aria-label="Search pictures by sensor location name" aria-describedby="pictureSearchStatus">
+            <button id="pictureSearchBtn" type="button">Search</button>
+          </div>
+          <p class="hint picture-search-status" id="pictureSearchStatus" aria-live="polite"></p>
           <label>
             Upload picture
             <input id="imageUpload" type="file" accept="image/*">
