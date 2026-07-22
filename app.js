@@ -112,8 +112,8 @@ const sensorApiMetricByReportMetric = {
   noise: { namespace: "nu", metric: "noise", rowKey: "noise" },
 };
 const defaultSensorFilterIdByMetric = {
-  air: "MOD-PM-01492",
-  pm10: "MOD-PM-01492",
+  air: "7",
+  pm10: "7",
   heat: "25",
   noise: "25",
 };
@@ -141,6 +141,12 @@ const legacyAqLocationIdByFilterId = {
   "MOD-PM-01599": "21",
   "MOD-PM-01600": "22",
   "MOD-PM-01601": "23",
+};
+const legacyNuLocationIdBySensorId = {
+  "9": "56",
+  "26": "9",
+  "49": "31",
+  "54": "23",
 };
 
 const metricLabels = {
@@ -656,10 +662,31 @@ function sensorReadingsUrl(namespace) {
 }
 
 function sensorDisplayId(kind, filterId) {
-  if (kind === "air") return `AQ Sensor ${filterId}`;
-  if (kind === "noise") return `Noise Sensor ${filterId}`;
-  if (kind === "heat") return `Heat Sensor ${filterId}`;
-  return `Sensor ${filterId}`;
+  if (kind === "air") return `AQ Location ${filterId}`;
+  if (kind === "noise") return `Noise Location ${filterId}`;
+  if (kind === "heat") return `Heat Location ${filterId}`;
+  return `Location ${filterId}`;
+}
+
+function catalogKeyedByLocation(catalog) {
+  const locations = new Map();
+  catalog.forEach((sensor) => {
+    const kind = String(sensor.id || "").split(":")[0];
+    const locationId = kind === "air"
+      ? legacyAqLocationIdByFilterId[sensor.filterId] || sensor.apiLocationId || sensor.filterId
+      : legacyNuLocationIdBySensorId[sensor.filterId] || sensor.apiLocationId || sensor.filterId;
+    if (!kind || !locationId) return;
+    const normalized = {
+      ...sensor,
+      id: `${kind}:${locationId}`,
+      filterId: String(locationId),
+      apiLocationId: String(locationId),
+      displayId: sensorDisplayId(kind, locationId),
+    };
+    const existing = locations.get(normalized.id);
+    if (!existing || /\(removed\)/i.test(existing.name || "")) locations.set(normalized.id, normalized);
+  });
+  return Array.from(locations.values());
 }
 
 function normalizeSensorName(value) {
@@ -751,7 +778,7 @@ async function loadSensorCatalog() {
   }));
 
   const loadedCatalog = catalogGroups.flat();
-  if (loadedCatalog.length) state.sensorCatalog = loadedCatalog;
+  if (loadedCatalog.length) state.sensorCatalog = catalogKeyedByLocation(loadedCatalog);
 }
 
 function normalizeRows(csvRows) {
@@ -3602,7 +3629,7 @@ document.getElementById("printBtn").addEventListener("click", async () => {
 });
 
 setCurrentPeriodDefaults();
-state.sensorCatalog = builtInSensorCatalog;
+state.sensorCatalog = catalogKeyedByLocation(builtInSensorCatalog);
 loadSampleData();
 preloadPictureAssets();
 setTemplate(state.template);
