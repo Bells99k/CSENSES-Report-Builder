@@ -41,11 +41,16 @@ The browser calls the Common Senses sensor API directly. The Data panel's `Load 
 ```text
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/sensors-list
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/sensors-list
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/cluster/clusters-list
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/readings?location_id=13&metric=pm25&start_date=2026-04-01&end_date=2026-04-30&aggregation=1day
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings?location_id=5&metric=heat_index&start_date=2026-01-01&end_date=2026-01-31&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/cluster-readings?cluster_id=7&metric=pm25&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/cluster-readings?cluster_id=7&metric=pm10&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-readings?cluster_id=7&metric=heat_index&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-readings?cluster_id=7&metric=noise&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
 ```
 
-The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise.
+The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise. Predefined clusters are loaded from the cluster list and retain their backend `cluster_id`; selecting one routes readings through the matching AQ or NU cluster endpoint.
 
 Response shape:
 

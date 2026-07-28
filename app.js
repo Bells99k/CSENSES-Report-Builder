@@ -5,6 +5,7 @@ const state = {
   uploadedImage: null,
   builtInImages: {},
   sensorCatalog: [],
+  clusterCatalog: [],
   dataSource: "sample",
   comparisonLocations: [],
   trendHoverDay: null,
@@ -34,6 +35,8 @@ const els = {
   includeMapPage: document.getElementById("includeMapPage"),
   location: document.getElementById("locationName"),
   locationMode: document.getElementById("locationMode"),
+  sensorLocation: document.getElementById("sensorLocationName"),
+  clusterLocation: document.getElementById("clusterLocationName"),
   month: document.getElementById("reportMonth"),
   monthControl: document.getElementById("reportMonthControl"),
   day: document.getElementById("reportDay"),
@@ -57,6 +60,9 @@ const els = {
   sensorSearch: document.getElementById("sensorSearch"),
   sensorSearchBtn: document.getElementById("sensorSearchBtn"),
   sensorSearchResults: document.getElementById("sensorSearchResults"),
+  clusterSearch: document.getElementById("clusterSearch"),
+  clusterSearchBtn: document.getElementById("clusterSearchBtn"),
+  clusterSearchResults: document.getElementById("clusterSearchResults"),
   customClusterName: document.getElementById("customClusterName"),
   customClusterSelect: document.getElementById("customClusterSelect"),
   customClusterAddBtn: document.getElementById("customClusterAddBtn"),
@@ -114,6 +120,18 @@ const defaultNoteText = "Type in your comments/stories/lived experience here (10
 const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
 const mapTileBaseUrl = "https://a.basemaps.cartocdn.com/light_all";
 const apiRequestTimeoutMs = 90000;
+const builtInClusterCatalog = [
+  { id: "1", clusterId: "1", name: "Pasadena, Supple, Columbia Roads Neighborhood Association" },
+  { id: "2", clusterId: "2", name: "Intervale/ Normandy Sts. Residents Association; Devon, Normandy, Brunswick Sts. Neighborhood Association; and Stanwood St/ Oldfields Rd/ Columbia Rd, Neighborhood Association" },
+  { id: "3", clusterId: "3", name: "Holborn, Gannett, Gaston, Otisfield Betterment Association" },
+  { id: "4", clusterId: "4", name: "Nine Streets United Neighborhood Association & Alaska/Perrin Association" },
+  { id: "5", clusterId: "5", name: "Sonoma, Maple, Schuyler, and surrounding streets" },
+  { id: "6", clusterId: "6", name: "Crawford, Howland, Ruthven, Wenonah Block Watch Association" },
+  { id: "7", clusterId: "7", name: "Garrison Trotter Neighborhood Association" },
+  { id: "8", clusterId: "8", name: "Fayston St Residents Association; Lawrence Ave. Group, and Blue Hill, Quincy, Howard, and Magnolia Neighborhood Association" },
+  { id: "9", clusterId: "9", name: "Roxbury Path Forward" },
+  { id: "10", clusterId: "10", name: "Mt. Pleasant, Forest & Vine Streets Neighborhood Association" },
+];
 const sensorApiMetricByReportMetric = {
   air: { namespace: "aq", metric: "pm25", rowKey: "air" },
   pm10: { namespace: "aq", metric: "pm10", rowKey: "pm10" },
@@ -690,6 +708,24 @@ function sensorReadingsUrl(namespace) {
   return `${sensorDataApiBaseUrl}/${namespace}/readings`;
 }
 
+function clusterListUrl() {
+  if (window.location.protocol.startsWith("http") &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+    return `${window.location.origin}/api/cluster/clusters-list`;
+  }
+  return `${sensorDataApiBaseUrl}/cluster/clusters-list`;
+}
+
+function clusterListUrls() {
+  const liveUrl = `${sensorDataApiBaseUrl}/cluster/clusters-list`;
+  const preferredUrl = clusterListUrl();
+  return preferredUrl === liveUrl ? [liveUrl] : [preferredUrl, liveUrl];
+}
+
+function clusterReadingsUrl(namespace) {
+  return `${sensorDataApiBaseUrl}/${namespace}/cluster-readings`;
+}
+
 function sensorDisplayId(kind, filterId) {
   if (kind === "air") return `AQ Location ${filterId}`;
   if (kind === "noise") return `Noise Location ${filterId}`;
@@ -772,6 +808,43 @@ async function loadRemoteSensorCatalog() {
     }
   }));
   return catalogGroups.flat();
+}
+
+function normalizeRemoteClusterCatalog(payload) {
+  const clusters = Array.isArray(payload?.clusters) ? payload.clusters : (Array.isArray(payload) ? payload : []);
+  return clusters.flatMap((cluster) => {
+    const clusterId = cleanSensorId(cluster.cluster_id ?? cluster.id ?? cluster.clusterId);
+    const name = cleanText(cluster.cluster_name || cluster.name || cluster.clusterName);
+    if (!clusterId || !name) return [];
+    return [{
+      id: clusterId,
+      clusterId,
+      name,
+    }];
+  });
+}
+
+async function loadClusterCatalog() {
+  let lastError = null;
+  for (const sourceUrl of clusterListUrls()) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const url = new URL(sourceUrl);
+        url.searchParams.set("_", `${Date.now()}-${attempt}`);
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Cluster list request failed with status ${response.status}`);
+        const clusters = normalizeRemoteClusterCatalog(await response.json());
+        if (!clusters.length) throw new Error("Cluster list response contained no clusters");
+        state.clusterCatalog = clusters;
+        return { loadedFromApi: true, error: null };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+  state.clusterCatalog = builtInClusterCatalog.map((cluster) => ({ ...cluster }));
+  console.warn("CSENSES cluster list unavailable.", lastError);
+  return { loadedFromApi: false, error: lastError };
 }
 
 async function loadSensorCatalog() {
@@ -1043,6 +1116,19 @@ function clusterOptionsFromRows() {
   return Array.from(clusters.values()).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 }
 
+function clusterOptionsFromCatalog() {
+  return state.clusterCatalog.map((cluster) => ({
+    kind: "cluster",
+    group: "Predefined sensor clusters",
+    id: cluster.id,
+    filterId: cluster.clusterId,
+    clusterId: cluster.clusterId,
+    value: locationValue("cluster", cluster.clusterId),
+    label: `${cluster.name} - Cluster ${cluster.clusterId}`,
+    display: cluster.name,
+  })).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
 function sensorOptionsFromRows() {
   if (state.dataSource !== "uploaded") return [];
   const sensors = new Map();
@@ -1092,7 +1178,13 @@ function sensorLocationOptions() {
 }
 
 function baseLocationOptions() {
-  return [...sensorOptionsFromCatalog(), ...clusterOptionsFromRows(), ...sensorOptionsFromRows()];
+  const uploadedClusters = state.dataSource === "uploaded" ? clusterOptionsFromRows() : [];
+  return [
+    ...sensorOptionsFromCatalog(),
+    ...sensorOptionsFromRows(),
+    ...uploadedClusters,
+    ...clusterOptionsFromCatalog(),
+  ];
 }
 
 function customClusterOptions(metric = selectedHazardMetric()) {
@@ -1152,6 +1244,7 @@ function reportLocationDisplay(value = els.location.value) {
 }
 
 function rowMatchesLocation(row, selection) {
+  if (row.locationValue && row.locationValue === selection.value) return true;
   if (selection.kind === "custom") {
     return (selection.members || []).some((memberValue) => rowMatchesLocation(row, selectedLocation(memberValue)));
   }
@@ -1209,16 +1302,28 @@ function defaultLocationValue(options) {
 function updateClusterOptions(preferredCluster = els.location.value) {
   const options = locationOptions();
   populateClusterSelect(els.location, options);
+  populateClusterSelect(els.sensorLocation, options.filter((option) => option.kind === "sensor"));
+  populateClusterSelect(els.clusterLocation, options.filter((option) => option.kind === "cluster"));
 
   const selectedValue = resolvePreferredLocation(preferredCluster, options);
   if (!selectedValue) return;
   els.location.value = selectedValue;
+  syncVisibleLocationSelects(selectedValue);
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
   syncPictureToSensorSelection(selectedValue);
   updateComparisonLocationOptions(selectedValue);
   renderCustomClusterBuilders();
   if (els.sensorSearch.value.trim()) renderSensorSearchResults();
   if (els.comparisonSearch?.value.trim()) renderComparisonSearchResults();
+}
+
+function syncVisibleLocationSelects(value = els.location.value) {
+  const selection = selectedLocation(value);
+  if (selection.kind === "cluster" && Array.from(els.clusterLocation.options).some((option) => option.value === value)) {
+    els.clusterLocation.value = value;
+  } else if (selection.kind === "sensor" && Array.from(els.sensorLocation.options).some((option) => option.value === value)) {
+    els.sensorLocation.value = value;
+  }
 }
 
 function populateClusterSelect(select, options) {
@@ -1415,7 +1520,7 @@ function createCustomCluster(context = "composite") {
 function matchingLocationOptions(query) {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return [];
-  return Array.from(els.location.options).filter((option) => {
+  return Array.from(els.sensorLocation.options).filter((option) => {
     return option.textContent.toLowerCase().includes(normalizedQuery) || option.value.toLowerCase().includes(normalizedQuery);
   });
 }
@@ -1426,6 +1531,7 @@ function hideSensorSearchResults() {
 
 function selectLocationSearchResult(value, label = "") {
   els.location.value = value;
+  syncVisibleLocationSelects(value);
   els.sensorSearch.value = label;
   hideSensorSearchResults();
   syncPictureToSensorSelection(value);
@@ -1440,7 +1546,7 @@ function renderSensorSearchResults({ force = false } = {}) {
     return [];
   }
 
-  const matches = query ? matchingLocationOptions(query).slice(0, 8) : Array.from(els.location.options).slice(0, 8);
+  const matches = query ? matchingLocationOptions(query).slice(0, 8) : Array.from(els.sensorLocation.options).slice(0, 8);
   els.sensorSearchResults.innerHTML = "";
 
   if (!matches.length) {
@@ -1485,6 +1591,49 @@ function searchLocationOptions() {
   }
 
   selectLocationSearchResult(match.value, match.textContent);
+}
+
+function hideClusterSearchResults() {
+  els.clusterSearchResults.hidden = true;
+}
+
+function selectClusterSearchResult(value, label = "") {
+  els.location.value = value;
+  syncVisibleLocationSelects(value);
+  els.clusterSearch.value = label;
+  hideClusterSearchResults();
+  els.location.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function renderClusterSearchResults({ force = false } = {}) {
+  const query = els.clusterSearch.value.trim().toLowerCase();
+  if (!query && !force) {
+    hideClusterSearchResults();
+    return [];
+  }
+  const options = Array.from(els.clusterLocation.options);
+  const matches = (query
+    ? options.filter((option) => option.textContent.toLowerCase().includes(query))
+    : options).slice(0, 8);
+  els.clusterSearchResults.innerHTML = "";
+  if (!matches.length) {
+    const empty = document.createElement("span");
+    empty.className = "sensor-search-empty";
+    empty.textContent = "No matching neighborhood clusters";
+    els.clusterSearchResults.append(empty);
+  } else {
+    matches.forEach((option) => {
+      const result = document.createElement("button");
+      result.type = "button";
+      result.className = "sensor-search-result";
+      result.setAttribute("role", "option");
+      result.textContent = option.textContent;
+      result.addEventListener("click", () => selectClusterSearchResult(option.value, option.textContent));
+      els.clusterSearchResults.append(result);
+    });
+  }
+  els.clusterSearchResults.hidden = false;
+  return matches;
 }
 
 function matchingComparisonOptions(query) {
@@ -3068,7 +3217,14 @@ function sensorApiConfigForReportMetric(metric) {
 }
 
 function selectedLocationCanLoadSensorData(selection, metric) {
-  return Boolean(sensorApiConfigForReportMetric(metric) && apiLocationId(selection));
+  return Boolean(sensorApiConfigForReportMetric(metric) &&
+    (selection.kind === "cluster" ? apiClusterId(selection) : apiLocationId(selection)));
+}
+
+function apiClusterId(selection) {
+  if (selection.kind !== "cluster") return "";
+  const value = String(selection.clusterId || selection.filterId || selection.id || "").trim();
+  return /^\d+$/.test(value) ? value : "";
 }
 
 function apiLocationId(selection) {
@@ -3096,9 +3252,9 @@ function apiReadingValue(reading, apiMetric) {
   return null;
 }
 
-function buildApiReadingsUrl({ namespace, locationId, apiMetric, startDate, endDate, aggregation }) {
-  const url = new URL(sensorReadingsUrl(namespace));
-  url.searchParams.set("location_id", locationId);
+function buildApiReadingsUrl({ namespace, locationId, clusterId, apiMetric, startDate, endDate, aggregation }) {
+  const url = new URL(clusterId ? clusterReadingsUrl(namespace) : sensorReadingsUrl(namespace));
+  url.searchParams.set(clusterId ? "cluster_id" : "location_id", clusterId || locationId);
   url.searchParams.set("metric", apiMetric);
   url.searchParams.set("start_date", startDate);
   url.searchParams.set("end_date", endDate);
@@ -3127,14 +3283,18 @@ function blankMetricRow() {
 
 function normalizeApiRows(payload, { selection, apiConfig }) {
   const readings = Array.isArray(payload?.readings) ? payload.readings : (Array.isArray(payload) ? payload : []);
-  const sensorId = String(payload?.location_id ?? selection.filterId ?? selection.id ?? "");
-  const cluster = selection.display || selection.label || `Location ${sensorId}`;
+  const isCluster = selection.kind === "cluster";
+  const sourceId = String(isCluster
+    ? (payload?.cluster_id ?? selection.clusterId ?? selection.filterId ?? selection.id ?? "")
+    : (payload?.location_id ?? selection.filterId ?? selection.id ?? ""));
+  const cluster = selection.display || selection.label || `${isCluster ? "Cluster" : "Location"} ${sourceId}`;
 
   return readings.map((reading) => {
     const row = {
       date: apiReadingDate(reading.timestamp || reading.date || reading.time),
       cluster,
-      sensorId,
+      sensorId: isCluster ? "" : sourceId,
+      clusterId: isCluster ? sourceId : "",
       locationValue: selection.value,
       ...blankMetricRow(),
     };
@@ -3154,16 +3314,18 @@ function mergeLoadedRows(nextRows, { selection, metric, startDate, endDate }) {
 }
 
 async function fetchRowsForSelection(selection, { apiConfig, start, end, aggregation, signal }) {
-  const locationId = apiLocationId(selection);
+  const clusterId = apiClusterId(selection);
+  const locationId = clusterId ? "" : apiLocationId(selection);
   const url = buildApiReadingsUrl({
     namespace: apiConfig.namespace,
     locationId,
+    clusterId,
     apiMetric: apiConfig.metric,
     startDate: start,
     endDate: end,
     aggregation,
   });
-  console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, apiMetric: apiConfig.metric, start, end, aggregation, url });
+  console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, clusterId, apiMetric: apiConfig.metric, start, end, aggregation, url });
   const response = await fetch(url, {
     cache: "no-store",
     signal,
@@ -3172,6 +3334,7 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
   console.info("CSENSES API response", {
     status: response.status,
     locationId: payload?.location_id,
+    clusterId: payload?.cluster_id,
     metric: payload?.metric,
     readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
   });
@@ -3708,11 +3871,12 @@ function setupNoteEditor({ editor, toolbar, fontFamilySelect, fontSizeSelect, cl
 }
 
 function syncLocationModeControls() {
-  const mode = els.locationMode?.value || "existing";
+  const mode = els.locationMode?.value || "sensor";
   document.querySelectorAll("[data-location-mode]").forEach((control) => {
     control.hidden = state.template !== "composite" || control.dataset.locationMode !== mode;
   });
-  if (mode !== "existing") hideSensorSearchResults();
+  if (mode !== "sensor") hideSensorSearchResults();
+  if (mode !== "cluster") hideClusterSearchResults();
 }
 
 function syncComparisonModeControls() {
@@ -3813,8 +3977,25 @@ document.querySelectorAll(".template-tab").forEach((button) => {
 });
 
 els.locationMode?.addEventListener("change", () => {
+  const select = els.locationMode.value === "cluster"
+    ? els.clusterLocation
+    : els.locationMode.value === "sensor"
+      ? els.sensorLocation
+      : null;
+  if (select?.value) {
+    els.location.value = select.value;
+    els.location.dispatchEvent(new Event("change", { bubbles: true }));
+  }
   syncLocationModeControls();
   renderCustomClusterBuilder("composite");
+});
+
+[els.sensorLocation, els.clusterLocation].filter(Boolean).forEach((select) => {
+  select.addEventListener("change", () => {
+    if (!select.value) return;
+    els.location.value = select.value;
+    els.location.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 });
 
 els.comparisonMode?.addEventListener("change", () => {
@@ -3868,6 +4049,26 @@ els.sensorSearch.addEventListener("keydown", (event) => {
   searchLocationOptions();
 });
 els.location.addEventListener("change", hideSensorSearchResults);
+
+els.clusterSearchBtn?.addEventListener("click", () => {
+  renderClusterSearchResults({ force: true });
+  els.clusterSearch.focus();
+});
+els.clusterSearch?.addEventListener("input", () => renderClusterSearchResults());
+els.clusterSearch?.addEventListener("focus", () => {
+  if (els.clusterSearch.value.trim()) renderClusterSearchResults();
+});
+els.clusterSearch?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    hideClusterSearchResults();
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const match = renderClusterSearchResults({ force: true })[0];
+  if (match) selectClusterSearchResult(match.value, match.textContent);
+});
+els.location.addEventListener("change", hideClusterSearchResults);
 
 els.customClusterAddBtn?.addEventListener("click", () => {
   addCustomClusterDraftSensor("composite");
@@ -4102,9 +4303,14 @@ els.snapshotTitleEditable?.addEventListener("input", () => {
 });
 setCurrentPeriodDefaults();
 state.sensorCatalog = catalogKeyedByLocation(builtInSensorCatalog);
+state.clusterCatalog = builtInClusterCatalog.map((cluster) => ({ ...cluster }));
 loadSampleData();
 preloadPictureAssets();
 setTemplate(state.template);
+loadClusterCatalog().then(() => {
+  updateClusterOptions(els.location.value);
+  render();
+});
 loadSensorCatalog().then(() => {
   updateClusterOptions(els.location.value);
   syncPictureToSensorSelection(els.location.value);

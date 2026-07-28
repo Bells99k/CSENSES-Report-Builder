@@ -8,6 +8,7 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
 const port = Number(process.env.PORT || 8000);
 const host = process.env.HOST || "127.0.0.1";
 const quantaqBaseUrl = "https://api.quant-aq.com/device-api/v1/data/resampled/";
+const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
 
 const mimeTypes = {
   ".avif": "image/avif",
@@ -97,6 +98,25 @@ async function handleQuantaqReadings(requestUrl, response) {
   }
 }
 
+async function handleClusterList(response) {
+  try {
+    const upstream = await fetch(`${sensorDataApiBaseUrl}/cluster/clusters-list`, {
+      cache: "no-store",
+    });
+    const text = await upstream.text();
+    response.writeHead(upstream.status, {
+      "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    });
+    response.end(text);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: "cluster_list_request_failed",
+      message: error.message || "Could not reach the cluster list API.",
+    });
+  }
+}
+
 function staticFilePath(pathname) {
   const decoded = decodeURIComponent(pathname);
   const normalized = normalize(decoded === "/" ? "/index.html" : decoded).replace(/^(\.\.[/\\])+/, "");
@@ -131,6 +151,10 @@ createServer((request, response) => {
   const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
   if (request.method === "GET" && requestUrl.pathname === "/api/quantaq/readings") {
     handleQuantaqReadings(requestUrl, response);
+    return;
+  }
+  if (request.method === "GET" && requestUrl.pathname === "/api/cluster/clusters-list") {
+    handleClusterList(response);
     return;
   }
   if (request.method !== "GET") {

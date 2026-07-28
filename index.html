@@ -76,29 +76,34 @@
             </select>
           </label>
           <label data-template-control="composite">
-            Sensor selection
+            Select sensors and locations
             <select id="locationMode">
-              <option value="existing">Use sensor locations or predefined clusters</option>
-              <option value="custom">Create your own sensor cluster</option>
+              <option value="sensor">Sensor locations</option>
+              <option value="cluster">Predefined neighborhood clusters</option>
+              <option value="custom">Create your own cluster</option>
             </select>
           </label>
-          <label data-template-control="composite" data-location-mode="existing">
-            Sensor or sensor cluster
-            <select id="locationName">
-              <option value="Sample Cluster 1">Sample Cluster 1</option>
-              <option value="Sample Cluster 2">Sample Cluster 2</option>
-              <option value="Sample Cluster 3">Sample Cluster 3</option>
-              <option value="Sample Cluster 4">Sample Cluster 4</option>
-              <option value="Sample Cluster 5">Sample Cluster 5</option>
-            </select>
+          <label data-template-control="composite" data-location-mode="sensor">
+            Sensor location
+            <select id="sensorLocationName"></select>
           </label>
-          <div class="sensor-search" data-template-control="composite" data-location-mode="existing">
+          <label data-template-control="composite" data-location-mode="cluster" hidden>
+            Predefined neighborhood cluster
+            <select id="clusterLocationName"></select>
+          </label>
+          <div class="sensor-search" data-template-control="composite" data-location-mode="cluster" hidden>
+            <input id="clusterSearch" type="search" placeholder="Search neighborhood clusters" autocomplete="off" aria-controls="clusterSearchResults">
+            <button id="clusterSearchBtn" type="button">Search</button>
+            <div id="clusterSearchResults" class="sensor-search-results" role="listbox" hidden></div>
+          </div>
+          <select id="locationName" hidden aria-hidden="true"></select>
+          <div class="sensor-search" data-template-control="composite" data-location-mode="sensor">
             <input id="sensorSearch" type="search" placeholder="Search sensors" autocomplete="off" aria-controls="sensorSearchResults">
             <button id="sensorSearchBtn" type="button">Search</button>
             <div id="sensorSearchResults" class="sensor-search-results" role="listbox" hidden></div>
           </div>
           <div class="field-group custom-cluster-builder" data-template-control="composite" data-location-mode="custom" hidden>
-            <p class="field-label">Create your own sensor cluster</p>
+            <p class="field-label">Create your own cluster</p>
             <label class="comparison-select-label">
               Cluster name
               <input id="customClusterName" type="text" placeholder="e.g., Blue Hill Ave Sensors" aria-describedby="customClusterStatus">
