@@ -1543,9 +1543,7 @@ function selectLocationSearchResult(value, label = "") {
   syncVisibleLocationSelects(value);
   els.sensorSearch.value = label;
   hideSensorSearchResults();
-  syncPictureToSensorSelection(value);
-  render();
-  updateDataStatusForSelection();
+  els.location.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function renderSensorSearchResults({ force = false } = {}) {
@@ -4037,6 +4035,9 @@ document.querySelectorAll(".template-tab").forEach((button) => {
         updateDataStatusForSelection();
       }
       if (input === els.apiAggregation && eventName === "change") syncSnapshotAggregationControls();
+      if (eventName === "change" && state.template === "composite" && input === els.location) {
+        loadApiData();
+      }
       if (eventName === "change" && state.template === "snapshot" &&
         (input === els.month || input === els.day || input === els.calendarMetric || input === els.apiAggregation)) {
         loadApiData();
