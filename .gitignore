@@ -2,3 +2,6 @@
 assets/.DS_Store
 config.local.json
 Sensor Photos/*.HEIC
+Box deployment photos/*
+!Box deployment photos/web/
+!Box deployment photos/web/*.jpg

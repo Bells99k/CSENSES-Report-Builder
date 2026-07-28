@@ -190,6 +190,10 @@ const pictureAssets = {
   waumbeckWarren: "Sensor Photos/Waumbeck and Warren Noise&Heat.jpg",
   elmHillWenonah: "Sensor Photos/Wenonah St and Elm Hill Ave.jpg",
 };
+const boxPhotoIds = [...Array.from({ length: 53 }, (_, index) => index + 1), 55];
+boxPhotoIds.forEach((boxId) => {
+  pictureAssets[`box${boxId}`] = `Box deployment photos/web/box-${String(boxId).padStart(2, "0")}.jpg`;
+});
 
 const builtInSensorCatalog = [
   {"group": "Air Quality Sensors", "id": "air:MOD-PM-01486", "filterId": "MOD-PM-01486", "displayId": "MOD-PM-01486", "name": "Blue Hill Ave @ Fayston St (Removed)", "latitude": 42.31422, "longitude": -71.07889},
@@ -2188,7 +2192,7 @@ function renderScene(canvas) {
     return;
   }
 
-  const builtInImage = state.builtInImages[state.imageChoice];
+  const builtInImage = state.builtInImages[state.imageChoice] || loadPictureAsset(state.imageChoice);
   if (builtInImage?.complete && builtInImage.naturalWidth) {
     const scale = Math.max(width / builtInImage.width, height / builtInImage.height);
     const drawW = builtInImage.width * scale;
@@ -2984,13 +2988,18 @@ function setupSnapshotMapInteractions() {
   });
 }
 
+function loadPictureAsset(key) {
+  if (!key || !pictureAssets[key]) return null;
+  if (state.builtInImages[key]) return state.builtInImages[key];
+  const image = new Image();
+  image.onload = render;
+  image.src = pictureAssets[key];
+  state.builtInImages[key] = image;
+  return image;
+}
+
 function preloadPictureAssets() {
-  Object.entries(pictureAssets).forEach(([key, src]) => {
-    const image = new Image();
-    image.onload = render;
-    image.src = src;
-    state.builtInImages[key] = image;
-  });
+  loadPictureAsset(state.imageChoice);
 }
 
 function plural(count, noun) {
@@ -3908,6 +3917,21 @@ els.pictureSelect.addEventListener("change", () => {
   render();
 });
 
+function registerBoxPhotoOptions() {
+  boxPhotoIds.forEach((boxId) => {
+    const pictureKey = `box${boxId}`;
+    if (Array.from(els.pictureSelect.options).some((option) => option.value === pictureKey)) return;
+    const sensor = builtInSensorCatalog.find((item) => {
+      const kind = item.id.split(":")[0];
+      return (kind === "heat" || kind === "noise") && Number(item.filterId) === boxId;
+    });
+    const label = sensor?.name ? `${sensor.name} (Box ${boxId})` : `Box ${boxId}`;
+    els.pictureSelect.append(new Option(label, pictureKey));
+  });
+}
+
+registerBoxPhotoOptions();
+
 const pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
   value: option.value,
   label: option.textContent,
@@ -3942,6 +3966,15 @@ function pictureKeyForSensorSelection(value) {
   const selection = selectedLocation(value, comparisonLocationOptions());
   if (selection.kind !== "sensor") return "";
   const catalogSensor = state.sensorCatalog.find((sensor) => sensor.id === selection.id);
+  const sensorKind = String(catalogSensor?.id || selection.id || "").split(":")[0];
+  const originalSensor = builtInSensorCatalog.find((sensor) => {
+    return sensor.id.split(":")[0] === sensorKind &&
+      normalizeSensorName(sensor.name) === normalizeSensorName(catalogSensor?.name || selection.display || selection.label);
+  });
+  const boxId = Number(originalSensor?.filterId || catalogSensor?.filterId || selection.filterId);
+  if ((sensorKind === "heat" || sensorKind === "noise") && boxPhotoIds.includes(boxId)) {
+    return `box${boxId}`;
+  }
   const names = [
     catalogSensor?.name,
     selection.display,
