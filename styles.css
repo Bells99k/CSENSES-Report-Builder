@@ -1261,8 +1261,74 @@ th {
   margin-top: 28px;
 }
 
+.snapshot-map-panel {
+  margin-top: 28px;
+  padding: 20px;
+}
+
+.snapshot-map-frame {
+  position: relative;
+  width: 100%;
+  height: 840px;
+  overflow: hidden;
+  border: 3px solid var(--line);
+  background: #eef1ed;
+  cursor: grab;
+  touch-action: none;
+}
+
+.snapshot-map-frame:active {
+  cursor: grabbing;
+}
+
+.snapshot-map-frame canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.snapshot-map-reset {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  border: 1px solid rgba(24, 27, 31, 0.24);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 850;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.snapshot-map-reset:hover {
+  background: #ffffff;
+}
+
 .snapshot-bottom h3 {
   margin-bottom: 12px;
+}
+
+.editable-title {
+  margin: 0 0 20px;
+  padding: 6px 10px;
+  border: 1px dashed transparent;
+  border-radius: 6px;
+  outline: none;
+  font-size: 2.4rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.editable-title:hover,
+.editable-title:focus {
+  border-color: rgba(24, 27, 31, 0.35);
+  background: #fbfbfa;
+}
+
+.snapshot-meta-centered {
+  margin: 0 0 20px;
+  text-align: center;
 }
 
 @media screen and (max-width: 1280px) {
@@ -1413,6 +1479,10 @@ th {
 }
 
 @media print {
+  .snapshot-map-reset {
+    display: none !important;
+  }
+
   @page {
     size: A4 portrait;
     margin: 6mm;
@@ -1492,6 +1562,83 @@ th {
   .template-trends.is-visible {
     display: grid;
     grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  }
+
+  .template-snapshot.is-visible {
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .template-snapshot .editable-title {
+    margin: 0 0 0.025in;
+    padding: 0.02in;
+    border: 0;
+    font-size: 18pt;
+    line-height: 1.05;
+  }
+
+  .template-snapshot .snapshot-meta-centered {
+    margin: 0 0 0.04in;
+    font-size: 9.5pt;
+  }
+
+  .template-snapshot .snapshot-map-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+    margin: 0;
+    padding: 0.065in;
+    overflow: hidden;
+  }
+
+  .template-snapshot .snapshot-map-panel .calendar-heading {
+    margin-bottom: 0.045in;
+  }
+
+  .template-snapshot .snapshot-map-panel .hint {
+    display: none;
+  }
+
+  .template-snapshot .snapshot-map-frame {
+    height: 100%;
+    min-height: 4.8in;
+    border-width: 1.5pt;
+  }
+
+  .template-snapshot .summary-grid {
+    margin-top: 0.055in;
+  }
+
+  .template-snapshot .summary-card {
+    min-height: 0.72in;
+    padding: 0.065in;
+  }
+
+  .template-snapshot .summary-card p {
+    font-size: 9.5pt;
+  }
+
+  .template-snapshot .summary-card strong {
+    margin-top: 0.035in;
+    font-size: 11pt;
+  }
+
+  .template-snapshot .snapshot-bottom {
+    min-height: 0;
+    margin-top: 0.045in;
+    padding: 0.065in;
+  }
+
+  .template-snapshot .snapshot-bottom h3 {
+    margin-bottom: 0.02in;
+    font-size: 10.5pt;
+  }
+
+  .template-snapshot .snapshot-bottom p {
+    font-size: 9pt;
+    line-height: 1.15;
   }
 
   .report-header {

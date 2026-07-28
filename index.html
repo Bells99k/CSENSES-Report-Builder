@@ -36,6 +36,7 @@
           <div class="segmented" role="tablist" aria-label="Choose report template">
             <button class="template-tab is-active" type="button" data-template="composite" role="tab" aria-selected="true">Template 1</button>
             <button class="template-tab" type="button" data-template="trends" role="tab" aria-selected="false">Template 2</button>
+            <button class="template-tab" type="button" data-template="snapshot" role="tab" aria-selected="false">Template 3</button>
           </div>
           <label>
             Your name
@@ -49,7 +50,7 @@
             Catchphrase
             <input id="reportCatchphrase" type="text" value="What's going on in Grove Hall?">
           </label>
-          <label class="check-item export-option">
+          <label class="check-item export-option" data-template-control="composite trends">
             <input id="includeMapPage" type="checkbox" checked>
             <span>Include sensor map page</span>
           </label>
@@ -57,9 +58,13 @@
 
         <section>
           <h2>Observation Period and Area</h2>
-          <label>
+          <label id="reportMonthControl">
             Select month
             <input id="reportMonth" type="month">
+          </label>
+          <label id="snapshotDayControl" data-template-control="snapshot" hidden>
+            Select day
+            <input id="reportDay" type="date">
           </label>
           <label>
             What to Report
@@ -111,7 +116,7 @@
             <div id="customClusterSelected" class="comparison-selected" aria-label="Selected custom cluster sensors"></div>
             <p class="hint custom-cluster-status" id="customClusterStatus" aria-live="polite"></p>
           </div>
-          <div class="field-group" data-template-control="trends" hidden>
+          <div class="field-group" data-template-control="trends snapshot" hidden>
             <p class="field-label">Comparison locations</p>
             <label class="comparison-select-label">
               Comparison selection
@@ -163,6 +168,7 @@
             Average period
             <select id="apiAggregation">
               <option value="1day" selected>1 day</option>
+              <option value="1month">1 month</option>
             </select>
           </label>
           <div class="data-actions" aria-label="Data actions">
@@ -389,33 +395,74 @@
           </section>
 
           <section class="template template-snapshot" data-template-panel="snapshot">
-            <header class="report-header compact">
-              <p class="template-label">Template 3</p>
-              <h2>Site Snapshot</h2>
-              <p id="snapshotSubhead">Sensor context, hazards, and interpretation notes.</p>
+            <header class="report-header">
+              <div class="report-masthead">
+                <img class="report-logo" src="assets/common-senses-logo.png" alt="Common Senses logo">
+                <p class="report-kicker">COMMON SENSES DATA OBSERVER REPORT</p>
+                <p class="template-label">Template 3</p>
+              </div>
             </header>
-            <div class="snapshot-layout">
-              <div class="media-card">
-                <canvas id="sceneCanvasSnapshot" width="720" height="620" aria-label="Selected report image"></canvas>
+            <h2 id="snapshotTitleEditable" class="editable-title" contenteditable="true" role="textbox" aria-label="Site snapshot title" spellcheck="false">Comparing Hazards Across Locations</h2>
+            <p class="report-meta snapshot-meta-centered" id="snapshotMeta">Prepared by Name</p>
+            <article class="panel snapshot-map-panel">
+              <div class="calendar-heading calendar-heatmap-heading">
+                <div class="calendar-title-block">
+                  <h3>Sensor locations</h3>
+                  <p class="hint">Scroll or pinch to zoom, drag to pan.</p>
+                </div>
+                <div class="standards-wrap">
+                  <p class="standards-title" id="snapshotStandardsTitle">Heat Index</p>
+                  <div class="hi-legend standard-legend" id="snapshotStandardsGraphic" aria-label="Selected metric standards color scale"></div>
+                </div>
               </div>
-              <div class="panel snapshot-copy">
-                <h3 id="snapshotLocation">Sample Cluster 1</h3>
-                <p id="snapshotNotes"></p>
-                <table>
-                  <thead>
-                    <tr><th>Hazard</th><th>Threshold</th><th>Days</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>PM₂.₅</td><td id="airThresholdCell">35</td><td id="airDaysCell">0</td></tr>
-                    <tr><td>Heat</td><td id="heatThresholdCell">80</td><td id="heatDaysCell">0</td></tr>
-                    <tr><td>Noise</td><td id="noiseThresholdCell">70</td><td id="noiseDaysCell">0</td></tr>
-                  </tbody>
-                </table>
+              <div class="snapshot-map-frame">
+                <canvas id="snapshotMapCanvas" width="1200" height="840" aria-label="Interactive map of this site's sensors"></canvas>
+                <button id="snapshotMapReset" type="button" class="snapshot-map-reset" title="Reset view">Reset view</button>
               </div>
-            </div>
-            <article class="panel info-panel snapshot-bottom">
-              <h3>Recommended interpretation</h3>
-              <p id="recommendationText">Load sensor data to automatically summarize exceedance patterns for this site.</p>
+            </article>
+
+            <article class="panel info-panel report-note-panel snapshot-bottom">
+              <div class="note-toolbar" aria-label="Template 3 comment editor tools">
+                <label class="note-tool-select">
+                  <span>Font</span>
+                  <select id="snapshotNoteFontFamily">
+                    <option value="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Sans Serif</option>
+                    <option value="Arial, Helvetica, sans-serif">Arial</option>
+                    <option value="'Aptos', 'Segoe UI', sans-serif">Aptos</option>
+                    <option value="'Calibri', 'Segoe UI', sans-serif">Calibri</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="Georgia, 'Times New Roman', serif">Serif</option>
+                    <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                    <option value="'Palatino Linotype', Palatino, serif">Palatino</option>
+                    <option value="'Courier New', monospace">Monospace</option>
+                    <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                  </select>
+                </label>
+                <label class="note-tool-select">
+                  <span>Size</span>
+                  <select id="snapshotNoteFontSize">
+                    <option value="14">14</option>
+                    <option value="16">16</option>
+                    <option value="18" selected>18</option>
+                    <option value="20">20</option>
+                    <option value="22">22</option>
+                    <option value="24">24</option>
+                    <option value="26">26</option>
+                  </select>
+                </label>
+                <div class="note-tool-group" aria-label="Text style">
+                  <button class="note-command" type="button" data-command="bold" title="Bold"><strong>B</strong></button>
+                  <button class="note-command" type="button" data-command="italic" title="Italic"><em>I</em></button>
+                  <button class="note-command" type="button" data-command="underline" title="Underline"><u>U</u></button>
+                </div>
+                <div class="note-tool-group" aria-label="Text alignment">
+                  <button class="note-command" type="button" data-command="justifyLeft" title="Align left">Left</button>
+                  <button class="note-command" type="button" data-command="justifyCenter" title="Align center">Center</button>
+                  <button class="note-command" type="button" data-command="justifyRight" title="Align right">Right</button>
+                </div>
+                <button id="snapshotNoteClearFormat" class="note-command note-clear" type="button" title="Clear formatting">Clear</button>
+              </div>
+              <div id="snapshotNotePreview" class="report-note-input" contenteditable="true" role="textbox" aria-label="Template 3 user note">Type in your comments/stories/lived experience here (100 words max)</div>
             </article>
           </section>
         </div>

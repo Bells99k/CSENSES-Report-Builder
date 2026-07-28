@@ -10,6 +10,9 @@ const state = {
   trendHoverDay: null,
   sensorPrintMapPromise: Promise.resolve(),
   sensorPrintMapRenderId: 0,
+  snapshotMapView: { initialized: false },
+  snapshotMapRenderId: 0,
+  snapshotMapPromise: Promise.resolve(),
   apiLoadId: 0,
   apiAbortController: null,
   comparisonLocationsEdited: false,
@@ -20,6 +23,7 @@ const state = {
   noteHtml: "",
   noteDirty: false,
   generatedNoteText: "",
+  snapshotTitleOverride: "Comparing Hazards Across Locations",
 };
 
 const els = {
@@ -31,6 +35,9 @@ const els = {
   location: document.getElementById("locationName"),
   locationMode: document.getElementById("locationMode"),
   month: document.getElementById("reportMonth"),
+  monthControl: document.getElementById("reportMonthControl"),
+  day: document.getElementById("reportDay"),
+  snapshotDayControl: document.getElementById("snapshotDayControl"),
   generalInfo: document.getElementById("generalInfo"),
   notePreview: document.getElementById("generalInfoPreview"),
   pictureSelect: document.getElementById("pictureSelect"),
@@ -76,7 +83,6 @@ const els = {
   trendChart: document.getElementById("trendChart"),
   trendTooltip: document.getElementById("trendTooltip"),
   trendScene: document.getElementById("sceneCanvasTrends"),
-  snapshotScene: document.getElementById("sceneCanvasSnapshot"),
   sensorMapPage: document.getElementById("sensorMapPage"),
   sensorMap: document.getElementById("sensorMap"),
   sensorMapLegend: document.getElementById("sensorMapLegend"),
@@ -84,6 +90,9 @@ const els = {
   sensorMapTitle: document.getElementById("sensorMapTitle"),
   sensorMapMeta: document.getElementById("sensorMapMeta"),
   sensorPrintMap: document.getElementById("sensorPrintMap"),
+  snapshotMapCanvas: document.getElementById("snapshotMapCanvas"),
+  snapshotMapReset: document.getElementById("snapshotMapReset"),
+  snapshotTitleEditable: document.getElementById("snapshotTitleEditable"),
 };
 
 const colors = {
@@ -849,6 +858,13 @@ function monthDateRange() {
     start: `${info.year}-${month}-01`,
     end: `${info.year}-${month}-${String(info.days).padStart(2, "0")}`,
   };
+}
+
+function selectedDataDateRange() {
+  if (state.template === "snapshot" && els.apiAggregation?.value === "1day" && els.day?.value) {
+    return { start: els.day.value, end: els.day.value };
+  }
+  return monthDateRange();
 }
 
 function thresholds() {
@@ -1791,8 +1807,11 @@ function renderStandards(metric) {
   const renderStandard = { ...standard, metric };
   const title = document.getElementById("standardsTitle");
   if (title) title.innerHTML = metricTextHtml(renderStandard.title);
+  const snapshotTitle = document.getElementById("snapshotStandardsTitle");
+  if (snapshotTitle) snapshotTitle.innerHTML = metricTextHtml(renderStandard.title);
   renderStandardsGraphic(document.getElementById("standardsGraphic"), renderStandard);
   renderStandardsGraphic(document.getElementById("comparisonStandardsGraphic"), renderStandard);
+  renderStandardsGraphic(document.getElementById("snapshotStandardsGraphic"), renderStandard);
 }
 
 function darkTextOn(color) {
@@ -2214,7 +2233,7 @@ function mappedSensorsForMetric() {
 }
 
 function selectedReportSensorIds() {
-  const selections = state.template === "trends"
+  const selections = state.template === "trends" || state.template === "snapshot"
     ? selectedComparisonLocations().map((location) => comparisonOption(location))
     : [selectedLocation(els.location.value, comparisonLocationOptions())];
   const ids = selections.flatMap((selection) => {
@@ -2237,6 +2256,32 @@ function selectedMappedSensors() {
 
 function sensorLocationValue(sensor) {
   return locationValue("sensor", sensor.id);
+}
+
+function sensorRowsForSensor(sensor) {
+  const { start, end } = selectedDataDateRange();
+  const sensorLocation = sensorLocationValue(sensor);
+  return state.rows.filter((row) => {
+    if (row.date < start || row.date > end) return false;
+    if (row.locationValue && row.locationValue === sensorLocation) return true;
+    return Boolean(row.sensorId) && (row.sensorId === sensor.filterId || row.sensorId === sensor.id);
+  });
+}
+
+function snapshotSensorValue(sensor, metric = selectedHazardMetric()) {
+  const rows = sensorRowsForSensor(sensor)
+    .filter((row) => row[metric] !== null && row[metric] !== undefined);
+  if (!rows.length) return null;
+  return roundNumber(rows.reduce((sum, row) => sum + row[metric], 0) / rows.length);
+}
+
+function standardColorForValue(value, metric = selectedHazardMetric()) {
+  if (value === null || value === undefined) return "#d6d9d7";
+  if (metric === "heat") return (heatIndexBand(value) || {}).color || "#ffffff";
+  const standard = metricStandards[metric] || metricStandards.composite;
+  const band = standard.bands.find((entry) => value >= entry.min && value < entry.max)
+    || standard.bands[standard.bands.length - 1];
+  return band.color;
 }
 
 function updateSensorMapDetails(sensors, selected) {
@@ -2523,6 +2568,28 @@ function drawSensorMarker(ctx, x, y, sensor, highlighted) {
   ctx.restore();
 }
 
+function drawSnapshotSensorMarker(ctx, x, y, sensor, highlighted) {
+  const value = snapshotSensorValue(sensor);
+  const fillColor = standardColorForValue(value);
+  const radius = highlighted ? 18 : 16;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.globalAlpha = highlighted ? 0.9 : 0.68;
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.lineWidth = highlighted ? 3 : 1.4;
+  ctx.strokeStyle = highlighted ? "#181b1f" : "rgba(24, 27, 31, 0.48)";
+  ctx.stroke();
+  ctx.fillStyle = darkTextOn(fillColor) ? "#11151a" : "#ffffff";
+  ctx.font = `800 ${value === null ? 10 : 9}px Inter, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(value === null ? "--" : String(roundNumber(value)), x, y);
+  ctx.restore();
+}
+
 function niceScaleDistance(meters) {
   if (!Number.isFinite(meters) || meters <= 0) return 100;
   const exponent = Math.floor(Math.log10(meters));
@@ -2613,6 +2680,30 @@ function drawNorthArrow(ctx, width) {
   ctx.restore();
 }
 
+function snapshotPeriodLabel() {
+  if (els.apiAggregation?.value === "1month") return monthInfo().long;
+  return formatReportDate(els.day?.value) || "Selected day";
+}
+
+function drawSnapshotPeriodLabel(ctx) {
+  const label = snapshotPeriodLabel();
+  ctx.save();
+  ctx.font = "800 16px Inter, sans-serif";
+  const width = ctx.measureText(label).width + 24;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.strokeStyle = "rgba(24, 27, 31, 0.55)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(16, 15, width, 34, 7);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#181b1f";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, 28, 32);
+  ctx.restore();
+}
+
 async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = []) {
   if (!els.sensorPrintMap) return;
   const renderId = state.sensorPrintMapRenderId + 1;
@@ -2684,7 +2775,7 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
 }
 
 function renderSensorMap() {
-  const pageIncluded = Boolean(els.includeMapPage?.checked);
+  const pageIncluded = state.template !== "snapshot" && Boolean(els.includeMapPage?.checked);
   if (els.sensorMapPage) els.sensorMapPage.hidden = !pageIncluded;
   if (!pageIncluded || !els.sensorPrintMap) return;
 
@@ -2698,6 +2789,180 @@ function renderSensorMap() {
 
   const selectedIds = updateSensorMapDetails(sensors, selected);
   state.sensorPrintMapPromise = renderStaticSensorPrintMap(sensors, selectedIds, selected);
+}
+
+const tileImageCache = new Map();
+
+function loadTileImageCached(src) {
+  if (!tileImageCache.has(src)) tileImageCache.set(src, loadTileImage(src));
+  return tileImageCache.get(src);
+}
+
+function canvasInternalPoint(event, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * (canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (canvas.height / rect.height),
+  };
+}
+
+function worldXToLon(worldX, zoom) {
+  return (worldX / (256 * (2 ** zoom))) * 360 - 180;
+}
+
+function ensureSnapshotMapView(sensors, selected, width, height) {
+  const view = state.snapshotMapView;
+  const focusSensors = selected.length ? selected : sensors;
+  const selectionKey = focusSensors.map((sensor) => sensor.id).sort().join(",");
+  if (view.initialized && view.selectionKey === selectionKey) return view;
+  if (!focusSensors.length) {
+    view.initialized = false;
+    return view;
+  }
+  const viewport = staticMapViewport(sensors.length ? sensors : focusSensors, width, height, focusSensors);
+  view.zoom = viewport.zoom;
+  view.centerX = viewport.left + viewport.width / 2;
+  view.centerY = viewport.top + viewport.height / 2;
+  view.selectionKey = selectionKey;
+  view.initialized = true;
+  return view;
+}
+
+function resizeCanvasForDisplay(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.round(rect.width));
+  const height = Math.max(1, Math.round(rect.height));
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+}
+
+async function renderSnapshotMap() {
+  if (state.template !== "snapshot" || !els.snapshotMapCanvas) return;
+  const canvas = els.snapshotMapCanvas;
+  resizeCanvasForDisplay(canvas);
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  const sensors = mappedSensorsForMetric();
+  const selected = selectedMappedSensors();
+  const displaySensors = sensors;
+  const view = ensureSnapshotMapView(sensors, [], width, height);
+  ctx.clearRect(0, 0, width, height);
+
+  if (!view.initialized) {
+    drawSensorPrintMapFallback(ctx, width, height);
+    ctx.fillStyle = "#626b76";
+    ctx.font = "700 22px Inter, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No mapped sensors are available for this hazard.", width / 2, height / 2);
+    return;
+  }
+
+  const renderId = state.snapshotMapRenderId + 1;
+  state.snapshotMapRenderId = renderId;
+  const left = view.centerX - width / 2;
+  const top = view.centerY - height / 2;
+  const zoom = view.zoom;
+  const tileJobs = [];
+  for (let tileX = worldToTile(left); tileX <= worldToTile(left + width); tileX += 1) {
+    for (let tileY = worldToTile(top); tileY <= worldToTile(top + height); tileY += 1) {
+      tileJobs.push({
+        x: tileX * 256 - left,
+        y: tileY * 256 - top,
+        src: `${mapTileBaseUrl}/${zoom}/${tileX}/${tileY}.png`,
+      });
+    }
+  }
+
+  drawSensorPrintMapFallback(ctx, width, height);
+  const loadedTiles = await Promise.all(tileJobs.map((job) => (
+    loadTileImageCached(job.src).then((image) => ({ ...job, image }))
+  )));
+  if (renderId !== state.snapshotMapRenderId) return;
+  loadedTiles.forEach((tile) => {
+    if (tile.image) ctx.drawImage(tile.image, tile.x, tile.y, 256, 256);
+  });
+
+  const selectedIds = new Set(selected.map((sensor) => sensor.id));
+  const highlightedPoints = [];
+  displaySensors.forEach((sensor) => {
+    const highlighted = selectedIds.has(sensor.id);
+    const x = lonToWorldX(sensor.longitude, zoom) - left;
+    const y = latToWorldY(sensor.latitude, zoom) - top;
+    if (x < -20 || x > width + 20 || y < -20 || y > height + 20) return;
+    drawSnapshotSensorMarker(ctx, x, y, sensor, highlighted);
+    if (highlighted) highlightedPoints.push({
+      x,
+      y,
+      label: sensor.name || sensor.displayId || sensor.filterId || "Selected sensor",
+    });
+  });
+  const placedLabels = [];
+  highlightedPoints.forEach((point) => {
+    drawHighlightedLabel(ctx, point.x, point.y, point.label, placedLabels, width, height);
+  });
+
+  drawSnapshotPeriodLabel(ctx);
+  drawNorthArrow(ctx, width);
+  drawMapScaleBar(ctx, { top, zoom }, width, height);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
+  ctx.fillRect(width - 286, height - 31, 276, 21);
+  ctx.fillStyle = "#2f363c";
+  ctx.font = "700 13px Inter, sans-serif";
+  ctx.textAlign = "right";
+  ctx.fillText("Map tiles (c) CARTO, map data (c) OpenStreetMap contributors", width - 16, height - 16);
+}
+
+function setupSnapshotMapInteractions() {
+  const canvas = els.snapshotMapCanvas;
+  if (!canvas) return;
+  let dragging = false;
+  let lastPoint = null;
+
+  canvas.addEventListener("wheel", (event) => {
+    if (!state.snapshotMapView.initialized) return;
+    event.preventDefault();
+    const view = state.snapshotMapView;
+    const point = canvasInternalPoint(event, canvas);
+    const left = view.centerX - canvas.width / 2;
+    const top = view.centerY - canvas.height / 2;
+    const lon = worldXToLon(left + point.x, view.zoom);
+    const lat = worldYToLat(top + point.y, view.zoom);
+    const nextZoom = clamp(view.zoom + (event.deltaY < 0 ? 1 : -1), 10, 16);
+    if (nextZoom === view.zoom) return;
+    view.zoom = nextZoom;
+    view.centerX = lonToWorldX(lon, nextZoom) - point.x + canvas.width / 2;
+    view.centerY = latToWorldY(lat, nextZoom) - point.y + canvas.height / 2;
+    state.snapshotMapPromise = renderSnapshotMap();
+  }, { passive: false });
+
+  canvas.addEventListener("pointerdown", (event) => {
+    if (!state.snapshotMapView.initialized) return;
+    dragging = true;
+    lastPoint = canvasInternalPoint(event, canvas);
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const point = canvasInternalPoint(event, canvas);
+    state.snapshotMapView.centerX -= point.x - lastPoint.x;
+    state.snapshotMapView.centerY -= point.y - lastPoint.y;
+    lastPoint = point;
+    state.snapshotMapPromise = renderSnapshotMap();
+  });
+  const endDrag = () => {
+    dragging = false;
+    lastPoint = null;
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  els.snapshotMapReset?.addEventListener("click", () => {
+    state.snapshotMapView.initialized = false;
+    state.snapshotMapPromise = renderSnapshotMap();
+  });
 }
 
 function preloadPictureAssets() {
@@ -2743,8 +3008,11 @@ function currentReportDateLabel() {
 
 function setCurrentPeriodDefaults() {
   const now = new Date();
+  const previousDay = new Date(now);
+  previousDay.setDate(previousDay.getDate() - 1);
   els.reportDate.value = currentDateInputValue(now);
   els.month.value = currentMonthInputValue(now);
+  if (els.day) els.day.value = currentDateInputValue(previousDay);
 }
 
 function loadSampleData() {
@@ -2761,7 +3029,10 @@ function updateDataStatusForSelection() {
   const apiConfig = sensorApiConfigForReportMetric(metric);
   const selection = selectedLocation();
   if (!apiConfig || !selectedLocationCanLoadSensorData(selection, metric) || selectedMetricRows().length) return;
-  setDataStatus(`No loaded ${metricDisplay(metric)} readings for ${selection.display || selection.label}. Click Load sensor data for the selected month.`, "neutral");
+  const periodLabel = state.template === "snapshot" && els.apiAggregation?.value === "1day"
+    ? "selected day"
+    : "selected month";
+  setDataStatus(`No loaded ${metricDisplay(metric)} readings for ${selection.display || selection.label}. Click Load sensor data for the ${periodLabel}.`, "neutral");
 }
 
 function sensorApiConfigForReportMetric(metric) {
@@ -2885,7 +3156,11 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
 }
 
 function selectedLoadLocations(metric) {
-  const values = state.template === "trends" ? selectedComparisonLocations() : [els.location.value];
+  const values = state.template === "snapshot"
+    ? mappedSensorsForMetric().map((sensor) => sensorLocationValue(sensor))
+    : state.template === "trends"
+      ? selectedComparisonLocations()
+      : [els.location.value];
   return values
     .flatMap((value) => {
       const selection = selectedLocation(value);
@@ -2928,7 +3203,7 @@ async function loadApiData() {
     return;
   }
 
-  const { start, end } = monthDateRange();
+  const { start, end } = selectedDataDateRange();
   const aggregation = els.apiAggregation?.value || "1day";
   const requestedLocationValue = els.location.value;
 
@@ -3068,6 +3343,17 @@ function rowsForGeneratedNote(metric) {
   }
 
   const location = reportLocationDisplay() || "Sensor Site";
+  if (state.template === "snapshot") {
+    const { start, end } = selectedDataDateRange();
+    const selection = selectedLocation();
+    return averageRowsByDate(state.rows.filter((row) => (
+      row.date >= start &&
+      row.date <= end &&
+      rowMatchesLocation(row, selection)
+    )))
+      .filter((row) => row[metric] !== null && row[metric] !== undefined)
+      .map((row) => ({ row, location }));
+  }
   return filteredRows()
     .filter((row) => row[metric] !== null && row[metric] !== undefined)
     .map((row) => ({ row, location }));
@@ -3102,53 +3388,67 @@ function generatedNoteObservationPhrase(group, totalCount) {
   }
 
   const dates = Array.from(group.dates).sort();
+  if (state.template === "snapshot" && els.apiAggregation?.value === "1day") {
+    return `on ${formatReportDate(els.day?.value) || formatMonthDay(dates[0])}`;
+  }
   if (dates.length === totalCount) return `on all ${plural(totalCount, "day")} with data`;
   if (dates.length <= 3) return `on ${formatTextList(dates.map(formatMonthDay))}`;
   return `on ${plural(dates.length, "day")}`;
 }
 
+function generatedNotePeriodLabel(info) {
+  if (state.template === "snapshot" && els.apiAggregation?.value === "1day") {
+    return formatReportDate(els.day?.value) || info.short;
+  }
+  return info.short;
+}
+
 function buildAirQualityGeneratedNote(info, location, metric) {
   const metricName = metricDisplay(metric);
   const context = state.template === "trends" ? "across the compared locations" : `at ${location}`;
+  const periodLabel = generatedNotePeriodLabel(info);
   const noteRows = rowsForGeneratedNote(metric);
   if (!noteRows.length) {
-    return `No observed ${metricName} daily averages are available for ${info.short} ${context}, so the air quality category cannot be summarized.`;
+    return `No observed ${metricName} daily averages are available for ${periodLabel} ${context}, so the air quality category cannot be summarized.`;
   }
 
   const observedGroups = observationGroupsForGeneratedNote(noteRows, metric);
   const highestGroup = observedGroups.sort((a, b) => b.index - a.index)[0];
   if (!highestGroup) {
-    return `No observed ${metricName} daily averages are available for ${info.short} ${context}, so the air quality category cannot be summarized.`;
+    return `No observed ${metricName} daily averages are available for ${periodLabel} ${context}, so the air quality category cannot be summarized.`;
   }
 
   const phrase = generatedNoteObservationPhrase(highestGroup, noteRows.length);
 
-  return truncateNoteText(`Based on observed daily ${metricName} averages for ${info.short} ${context}, air quality was in the ${highestGroup.band.label} category ${phrase}.\n${highestGroup.band.recommendation}`);
+  return truncateNoteText(`Based on observed daily ${metricName} averages for ${periodLabel} ${context}, air quality was in the ${highestGroup.band.label} category ${phrase}.\n${highestGroup.band.recommendation}`);
 }
 
 function buildHeatIndexGeneratedNote(info, location) {
   const metric = "heat";
   const context = state.template === "trends" ? "across the compared locations" : `at ${location}`;
+  const periodLabel = generatedNotePeriodLabel(info);
   const noteRows = rowsForGeneratedNote(metric);
   if (!noteRows.length) {
-    return `No observed daily heat index averages are available for ${info.short} ${context}, so the heat index category cannot be summarized.`;
+    return `No observed daily heat index averages are available for ${periodLabel} ${context}, so the heat index category cannot be summarized.`;
   }
 
   const observedGroups = observationGroupsForGeneratedNote(noteRows, metric);
   const highestGroup = observedGroups.sort((a, b) => b.index - a.index)[0];
   if (!highestGroup) {
-    return `No observed daily heat index averages are available for ${info.short} ${context}, so the heat index category cannot be summarized.`;
+    return `No observed daily heat index averages are available for ${periodLabel} ${context}, so the heat index category cannot be summarized.`;
   }
 
   if (highestGroup.index === 0) {
     const coverage = state.template === "trends"
       ? `all ${plural(noteRows.length, "daily location reading")} were`
-      : `all ${plural(noteRows.length, "day")} with data were`;
-    return `Based on observed daily heat index averages for ${info.short} ${context}, ${coverage} below 80°F, so no heat index advisory category applied.`;
+      : state.template === "snapshot" && els.apiAggregation?.value === "1day"
+        ? "the selected day was"
+        : `all ${plural(noteRows.length, "day")} with data were`;
+    return `Based on observed daily heat index averages for ${periodLabel} ${context}, ${coverage} below 80°F, so no heat index advisory category applied.`;
   }
 
   const phrase = generatedNoteObservationPhrase(highestGroup, noteRows.length);
-  return truncateNoteText(`Based on observed daily heat index averages for ${info.short} ${context}, the heat index was in the ${highestGroup.band.label} category ${phrase}. Health effect: ${highestGroup.band.healthEffect}\nRecommendations: ${highestGroup.band.recommendation}`);
+  return truncateNoteText(`Based on observed daily heat index averages for ${periodLabel} ${context}, the heat index was in the ${highestGroup.band.label} category ${phrase}. Health effect: ${highestGroup.band.healthEffect}\nRecommendations: ${highestGroup.band.recommendation}`);
 }
 
 function buildGeneratedNote(info, location) {
@@ -3243,6 +3543,10 @@ function updateText() {
   document.getElementById("trendCatchphrasePreview").textContent = catchphrase;
   document.getElementById("trendPhotoTitle").textContent = comparedLocationText;
   document.getElementById("trendMeta").textContent = `Prepared by ${author} on ${reportDate}`;
+  if (els.snapshotTitleEditable && document.activeElement !== els.snapshotTitleEditable) {
+    els.snapshotTitleEditable.textContent = state.snapshotTitleOverride || catchphrase;
+  }
+  document.getElementById("snapshotMeta").textContent = `Prepared by ${author} on ${reportDate}`;
   document.getElementById("calendarMonth").textContent = info.long;
   document.getElementById("trendMonth").textContent = info.long;
   els.previewCluster.textContent = location;
@@ -3261,12 +3565,13 @@ function updateText() {
   if (document.activeElement !== trendNote) {
     trendNote.innerHTML = noteHtml;
   }
+  const snapshotNote = document.getElementById("snapshotNotePreview");
+  if (document.activeElement !== snapshotNote) {
+    snapshotNote.innerHTML = noteHtml;
+  }
   els.notePreview.classList.toggle("empty-note", !userNote);
   trendNote.classList.toggle("empty-note", !userNote);
-  document.getElementById("snapshotSubhead").textContent = `${location} sensor context and interpretation notes.`;
-  document.getElementById("snapshotLocation").textContent = location;
-  document.getElementById("snapshotNotes").textContent = userNote || defaultNoteText;
-
+  snapshotNote.classList.toggle("empty-note", !userNote);
   const selectedMetric = els.calendarMetric.value;
   const selectedMetricNameHtml = metricDisplayHtml(selectedMetric);
   const selectedMetricUnit = metricUnit(selectedMetric);
@@ -3279,17 +3584,6 @@ function updateText() {
   document.getElementById("dangerHeatSummary").textContent = selectedMetricStats.topBand ? `${selectedMetricStats.topBand.label}: ${plural(selectedMetricStats.topBand.count, "day")}` : "--";
   updateComparisonSummary();
 
-  document.getElementById("airThresholdCell").textContent = `${els.airThreshold.value} ug/m3`;
-  document.getElementById("heatThresholdCell").textContent = `${els.heatThreshold.value} °F`;
-  document.getElementById("noiseThresholdCell").textContent = `${els.noiseThreshold.value} dB`;
-  document.getElementById("airDaysCell").textContent = stats.counts.air;
-  document.getElementById("heatDaysCell").textContent = stats.counts.heat;
-  document.getElementById("noiseDaysCell").textContent = stats.counts.noise;
-
-  const total = stats.counts.air + stats.counts.pm10 + stats.counts.heat + stats.counts.noise;
-  document.getElementById("recommendationText").textContent = total
-    ? `${info.short} shows ${total} combined threshold exceedances based on daily averages for ${location}. Compare clustered days against site activity, weather, and nearby sources before assigning cause.`
-    : `No threshold exceedances are currently shown for ${location}. Adjust thresholds, choose another sensor or cluster, or load sensor data to refine the interpretation.`;
 }
 
 function render() {
@@ -3298,8 +3592,8 @@ function render() {
   renderScene(els.reportScene);
   renderTrendChart();
   renderScene(els.trendScene);
-  renderScene(els.snapshotScene);
   renderSensorMap();
+  state.snapshotMapPromise = renderSnapshotMap();
 }
 
 function noteWords(text) {
@@ -3390,10 +3684,22 @@ function syncLocationModeControls() {
 
 function syncComparisonModeControls() {
   const mode = els.comparisonMode?.value || "existing";
+  const usesComparisons = state.template === "trends" || state.template === "snapshot";
   document.querySelectorAll("[data-comparison-mode]").forEach((control) => {
-    control.hidden = state.template !== "trends" || control.dataset.comparisonMode !== mode;
+    control.hidden = !usesComparisons || control.dataset.comparisonMode !== mode;
   });
   if (mode !== "existing") hideComparisonSearchResults();
+}
+
+function syncSnapshotAggregationControls() {
+  if (!els.snapshotDayControl || !els.day || !els.monthControl || !els.month) return;
+  const usesDailyAggregation = els.apiAggregation?.value !== "1month";
+  const dayIsAvailable = state.template === "snapshot" && usesDailyAggregation;
+  const monthIsAvailable = state.template !== "snapshot" || !usesDailyAggregation;
+  els.snapshotDayControl.hidden = !dayIsAvailable;
+  els.day.disabled = !dayIsAvailable;
+  els.monthControl.hidden = !monthIsAvailable;
+  els.month.disabled = !monthIsAvailable;
 }
 
 function setTemplate(template) {
@@ -3408,27 +3714,50 @@ function setTemplate(template) {
     panel.classList.toggle("is-visible", panel.dataset.templatePanel === template);
   });
   document.querySelectorAll("[data-template-control]").forEach((control) => {
-    control.hidden = control.dataset.templateControl !== template;
+    const allowedTemplates = control.dataset.templateControl.split(/\s+/);
+    control.hidden = !allowedTemplates.includes(template);
   });
   syncLocationModeControls();
   syncComparisonModeControls();
+  syncSnapshotAggregationControls();
+  if (template === "snapshot") {
+    state.snapshotMapView.initialized = false;
+    state.snapshotMapPromise = renderSnapshotMap();
+  }
 }
 
 document.querySelectorAll(".template-tab").forEach((button) => {
   button.addEventListener("click", () => {
     setTemplate(button.dataset.template);
     render();
+    if (state.template === "snapshot") loadApiData();
   });
 });
 
 ["input", "change"].forEach((eventName) => {
-  [els.title, els.author, els.reportDate, els.catchphrase, els.includeMapPage, els.location, els.month, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric].forEach((input) => {
+  [els.title, els.author, els.reportDate, els.catchphrase, els.includeMapPage, els.location, els.month, els.day, els.generalInfo, els.airThreshold, els.pm10Threshold, els.heatThreshold, els.noiseThreshold, els.calendarMetric, els.apiAggregation].filter(Boolean).forEach((input) => {
     input.addEventListener(eventName, () => {
       if (input === els.generalInfo) syncNoteFromTextInput();
+      if (input === els.day && eventName === "change" && els.day.value) {
+        els.month.value = els.day.value.slice(0, 7);
+      }
+      if (input === els.month && eventName === "change" && els.month.value && els.day) {
+        const currentDay = Number(els.day.value.slice(8, 10)) || 1;
+        const [year, month] = els.month.value.split("-").map(Number);
+        const lastDay = new Date(year, month, 0).getDate();
+        els.day.value = `${els.month.value}-${String(Math.min(currentDay, lastDay)).padStart(2, "0")}`;
+      }
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(metricChangePreferredLocationValue());
       if (input === els.location && eventName === "change") updateComparisonLocationOptions(els.location.value);
       render();
-      if (input === els.location || input === els.month || input === els.calendarMetric) updateDataStatusForSelection();
+      if (input === els.location || input === els.month || input === els.day || input === els.calendarMetric || input === els.apiAggregation) {
+        updateDataStatusForSelection();
+      }
+      if (input === els.apiAggregation && eventName === "change") syncSnapshotAggregationControls();
+      if (eventName === "change" && state.template === "snapshot" &&
+        (input === els.month || input === els.day || input === els.calendarMetric || input === els.apiAggregation)) {
+        loadApiData();
+      }
     });
   });
 });
@@ -3457,6 +3786,14 @@ setupNoteEditor({
   fontFamilySelect: document.getElementById("trendNoteFontFamily"),
   fontSizeSelect: document.getElementById("trendNoteFontSize"),
   clearButton: document.getElementById("trendNoteClearFormat"),
+});
+
+setupNoteEditor({
+  editor: document.getElementById("snapshotNotePreview"),
+  toolbar: document.getElementById("snapshotNotePreview").previousElementSibling,
+  fontFamilySelect: document.getElementById("snapshotNoteFontFamily"),
+  fontSizeSelect: document.getElementById("snapshotNoteFontSize"),
+  clearButton: document.getElementById("snapshotNoteClearFormat"),
 });
 
 els.trendChart.addEventListener("pointermove", updateTrendTooltip);
@@ -3624,10 +3961,15 @@ els.loadApiBtn?.addEventListener("click", () => {
 document.getElementById("printBtn").addEventListener("click", async () => {
   renderSensorMap();
   await state.sensorPrintMapPromise;
+  await state.snapshotMapPromise;
   await wait(250);
   window.print();
 });
 
+setupSnapshotMapInteractions();
+els.snapshotTitleEditable?.addEventListener("input", () => {
+  state.snapshotTitleOverride = els.snapshotTitleEditable.textContent.trim() || null;
+});
 setCurrentPeriodDefaults();
 state.sensorCatalog = catalogKeyedByLocation(builtInSensorCatalog);
 loadSampleData();
@@ -3636,4 +3978,8 @@ setTemplate(state.template);
 loadSensorCatalog().then(() => {
   updateClusterOptions(els.location.value);
   render();
+});
+
+window.addEventListener("resize", () => {
+  if (state.template === "snapshot") state.snapshotMapPromise = renderSnapshotMap();
 });
