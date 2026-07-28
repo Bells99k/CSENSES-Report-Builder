@@ -173,6 +173,22 @@ const sensorMapFillColors = {
 
 const pictureAssets = {
   grove: "assets/Grove Hall.avif",
+  seaverWalnut: "Sensor Photos/AQ Seaver St and Walnut.jpg",
+  trotterElementary: "Sensor Photos/AQ Trotter Elementary.jpg",
+  ceylonPark: "Sensor Photos/Ceylon Park.jpg",
+  genevaBlueHill: "Sensor Photos/Columbia and Geneva AQ.jpg",
+  crawford: "Sensor Photos/Crawford btwn Harold & Humboldt Noise and Heat.jpg",
+  eastCottageBatchelder: "Sensor Photos/E. Cottage & Batchelder St.jpg",
+  elmHillPark: "Sensor Photos/Elm Hill Park.jpg",
+  elmHillCheney: "Sensor Photos/Elm Hill and Cheney.jpg",
+  forestVine: "Sensor Photos/Forest St and Vine St.jpg",
+  homesteadHarold: "Sensor Photos/Homestead and Harold Noise and Heat.jpg",
+  humboldtSeaver: "Sensor Photos/Humboldt Ave and Seaver St.jpg",
+  marshfieldBatchelder: "Sensor Photos/Marshfield St and Batchelder St.jpg",
+  normandyStanwood: "Sensor Photos/Normandy and Stanwood.jpg",
+  ruthvenHumboldt: "Sensor Photos/Ruthven and Humboldt.jpg",
+  waumbeckWarren: "Sensor Photos/Waumbeck and Warren Noise&Heat.jpg",
+  elmHillWenonah: "Sensor Photos/Wenonah St and Elm Hill Ave.jpg",
 };
 
 const builtInSensorCatalog = [
@@ -1194,6 +1210,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   if (!selectedValue) return;
   els.location.value = selectedValue;
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
+  syncPictureToSensorSelection(selectedValue);
   updateComparisonLocationOptions(selectedValue);
   renderCustomClusterBuilders();
   if (els.sensorSearch.value.trim()) renderSensorSearchResults();
@@ -1407,6 +1424,7 @@ function selectLocationSearchResult(value, label = "") {
   els.location.value = value;
   els.sensorSearch.value = label;
   hideSensorSearchResults();
+  syncPictureToSensorSelection(value);
   render();
   updateDataStatusForSelection();
 }
@@ -1487,6 +1505,7 @@ function addComparisonLocation(value) {
   els.comparisonSearch.value = "";
   hideComparisonSearchResults();
   renderComparisonSelected();
+  syncPictureToSensorSelection(value);
   render();
 }
 
@@ -3748,7 +3767,10 @@ document.querySelectorAll(".template-tab").forEach((button) => {
         els.day.value = `${els.month.value}-${String(Math.min(currentDay, lastDay)).padStart(2, "0")}`;
       }
       if (input === els.calendarMetric && eventName === "change") updateClusterOptions(metricChangePreferredLocationValue());
-      if (input === els.location && eventName === "change") updateComparisonLocationOptions(els.location.value);
+      if (input === els.location && eventName === "change") {
+        updateComparisonLocationOptions(els.location.value);
+        syncPictureToSensorSelection(els.location.value);
+      }
       render();
       if (input === els.location || input === els.month || input === els.day || input === els.calendarMetric || input === els.apiAggregation) {
         updateDataStatusForSelection();
@@ -3891,6 +3913,62 @@ const pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
   label: option.textContent,
 }));
 
+const pictureKeyBySensorName = new Map([
+  ["Seaver and Walnut", "seaverWalnut"],
+  ["AQ Seaver St and Walnut", "seaverWalnut"],
+  ["Trotter Elementary", "trotterElementary"],
+  ["Ceylon Park", "ceylonPark"],
+  ["Geneva @ Blue Hill", "genevaBlueHill"],
+  ["Columbia and Geneva", "genevaBlueHill"],
+  ["Crawford (behind Crispus Attucks Children Center)", "crawford"],
+  ["Crawford between Harold and Humboldt", "crawford"],
+  ["E. Cottage & Batchelder St", "eastCottageBatchelder"],
+  ["Elm Hill Park", "elmHillPark"],
+  ["Elm Hill and Cheney", "elmHillCheney"],
+  ["Forest St and Vine St", "forestVine"],
+  ["Homestead and Harold", "homesteadHarold"],
+  ["Humboldt and Seaver", "humboldtSeaver"],
+  ["Humboldt Ave and Seaver St", "humboldtSeaver"],
+  ["Marshfield St and Batchelder St", "marshfieldBatchelder"],
+  ["Batchelder and Marshfield", "marshfieldBatchelder"],
+  ["Normandy and Stanwood", "normandyStanwood"],
+  ["Ruthven and Humboldt", "ruthvenHumboldt"],
+  ["Waumbeck and Warren", "waumbeckWarren"],
+  ["Elm Hill Ave and Wenonah St", "elmHillWenonah"],
+  ["Wenonah St and Elm Hill Ave", "elmHillWenonah"],
+].map(([name, pictureKey]) => [normalizeSensorName(name), pictureKey]));
+
+function pictureKeyForSensorSelection(value) {
+  const selection = selectedLocation(value, comparisonLocationOptions());
+  if (selection.kind !== "sensor") return "";
+  const catalogSensor = state.sensorCatalog.find((sensor) => sensor.id === selection.id);
+  const names = [
+    catalogSensor?.name,
+    selection.display,
+    selection.label,
+  ].filter(Boolean);
+  for (const name of names) {
+    const key = pictureKeyBySensorName.get(normalizeSensorName(name));
+    if (key) return key;
+  }
+  return "";
+}
+
+function syncPictureToSensorSelection(value) {
+  const pictureKey = pictureKeyForSensorSelection(value);
+  if (!pictureKey) return false;
+  if (!Array.from(els.pictureSelect.options).some((option) => option.value === pictureKey)) {
+    els.pictureSelect.replaceChildren(...pictureOptions.map(({ value: optionValue, label }) => (
+      new Option(label, optionValue)
+    )));
+  }
+  els.pictureSelect.value = pictureKey;
+  state.imageChoice = pictureKey;
+  state.uploadedImage = null;
+  els.imageUpload.value = "";
+  return true;
+}
+
 function searchPictures() {
   const query = els.pictureSearch.value.trim().toLocaleLowerCase();
   const matches = pictureOptions.filter(({ label }) => label.toLocaleLowerCase().includes(query));
@@ -3977,6 +4055,7 @@ preloadPictureAssets();
 setTemplate(state.template);
 loadSensorCatalog().then(() => {
   updateClusterOptions(els.location.value);
+  syncPictureToSensorSelection(els.location.value);
   render();
 });
 
