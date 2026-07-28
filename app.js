@@ -119,7 +119,10 @@ const noteWordLimit = 100;
 const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
 const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
 const mapTileBaseUrl = "https://a.basemaps.cartocdn.com/light_all";
-const apiRequestTimeoutMs = 90000;
+const apiRequestTimeoutMs = 45000;
+const apiBatchTimeoutMs = 90000;
+const catalogRequestTimeoutMs = 10000;
+const maxConcurrentSensorRequests = 4;
 const builtInClusterCatalog = [
   { id: "1", clusterId: "1", name: "Pasadena, Supple, Columbia Roads Neighborhood Association" },
   { id: "2", clusterId: "2", name: "Intervale/ Normandy Sts. Residents Association; Devon, Normandy, Brunswick Sts. Neighborhood Association; and Stanwood St/ Oldfields Rd/ Columbia Rd, Neighborhood Association" },
@@ -800,7 +803,10 @@ function normalizeRemoteSensorCatalog(payload, source) {
 async function loadRemoteSensorCatalog() {
   const catalogGroups = await Promise.all(remoteSensorCatalogSources.map(async (source) => {
     try {
-      const response = await fetch(sensorListUrl(source.namespace), { cache: "no-store" });
+      const response = await fetchWithTimeout(sensorListUrl(source.namespace), {
+        cache: "no-store",
+        timeoutMs: catalogRequestTimeoutMs,
+      });
       if (!response.ok) return [];
       return normalizeRemoteSensorCatalog(await response.json(), source);
     } catch {
@@ -831,7 +837,10 @@ async function loadClusterCatalog() {
       try {
         const url = new URL(sourceUrl);
         url.searchParams.set("_", `${Date.now()}-${attempt}`);
-        const response = await fetch(url, { cache: "no-store" });
+        const response = await fetchWithTimeout(url, {
+          cache: "no-store",
+          timeoutMs: catalogRequestTimeoutMs,
+        });
         if (!response.ok) throw new Error(`Cluster list request failed with status ${response.status}`);
         const clusters = normalizeRemoteClusterCatalog(await response.json());
         if (!clusters.length) throw new Error("Cluster list response contained no clusters");
@@ -3264,6 +3273,51 @@ function buildApiReadingsUrl({ namespace, locationId, clusterId, apiMetric, star
   return url.toString();
 }
 
+async function fetchWithTimeout(resource, { timeoutMs = apiRequestTimeoutMs, signal, ...options } = {}) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const abortFromParent = () => controller.abort(signal?.reason);
+  if (signal?.aborted) abortFromParent();
+  else signal?.addEventListener("abort", abortFromParent, { once: true });
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(resource, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (timedOut && error?.name === "AbortError") {
+      const timeoutError = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds.`);
+      timeoutError.name = "TimeoutError";
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abortFromParent);
+  }
+}
+
+async function settleWithConcurrency(items, concurrency, task) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      try {
+        results[index] = { status: "fulfilled", value: await task(items[index], index) };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
+
 function apiLoadedDateSpan(rows) {
   const dates = rows.map((row) => row.date).filter(Boolean).sort();
   if (!dates.length) return "";
@@ -3326,9 +3380,10 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
     aggregation,
   });
   console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, clusterId, apiMetric: apiConfig.metric, start, end, aggregation, url });
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     cache: "no-store",
     signal,
+    timeoutMs: apiRequestTimeoutMs,
   });
   const payload = await response.json().catch(() => ({}));
   console.info("CSENSES API response", {
@@ -3376,19 +3431,19 @@ async function loadApiData() {
   state.apiLoadId = loadId;
   if (state.apiAbortController) state.apiAbortController.abort();
   state.apiAbortController = new AbortController();
-  const timeoutId = window.setTimeout(() => state.apiAbortController?.abort(), apiRequestTimeoutMs);
+  const requestController = state.apiAbortController;
 
   const metric = els.calendarMetric.value;
   const apiConfig = sensorApiConfigForReportMetric(metric);
   if (!apiConfig) {
-    window.clearTimeout(timeoutId);
+    state.apiAbortController = null;
     setDataStatus("Sensor data loading currently supports PM2.5, PM10, Heat Index, and Noise.", "error");
     return;
   }
 
   const selections = selectedLoadLocations(metric);
   if (!selections.length) {
-    window.clearTimeout(timeoutId);
+    state.apiAbortController = null;
     setDataStatus(apiConfig.namespace === "aq"
       ? "Choose one or more air quality sensors before loading PM data."
       : "Choose one or more numbered Heat or Noise sensors before loading sensor data.", "error");
@@ -3403,17 +3458,22 @@ async function loadApiData() {
   const button = els.loadApiBtn;
   if (button) button.disabled = true;
   setDataStatus(`Loading ${metricDisplay(metric)} for ${selections.length} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
+  let batchTimedOut = false;
+  const batchTimeoutId = window.setTimeout(() => {
+    batchTimedOut = true;
+    requestController.abort();
+  }, apiBatchTimeoutMs);
 
   try {
-    const results = await Promise.allSettled(selections.map((selection) => {
+    const results = await settleWithConcurrency(selections, maxConcurrentSensorRequests, (selection) => {
       return fetchRowsForSelection(selection, {
         apiConfig,
         start,
         end,
         aggregation: apiAggregation,
-        signal: state.apiAbortController.signal,
+        signal: requestController.signal,
       }).then((result) => ({ selection, ...result }));
-    }));
+    });
 
     if (loadId !== state.apiLoadId) return;
 
@@ -3449,6 +3509,11 @@ async function loadApiData() {
 
     if (!loaded.length) {
       const abortError = failed.find((item) => item.error?.name === "AbortError")?.error;
+      if (abortError && batchTimedOut) {
+        const timeoutError = new Error("The sensor API did not return any data within 90 seconds.");
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
+      }
       if (abortError) throw abortError;
       const firstError = failed.find((item) => item.error)?.error;
       throw new Error(firstError?.message || `No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
@@ -3463,7 +3528,9 @@ async function loadApiData() {
     const dateSpans = loaded.map((item) => apiLoadedDateSpan(item.rows)).filter(Boolean);
     const dateSpan = dateSpans.length ? dateSpans[0] : `${start} to ${end}`;
     const skipped = failed.length + emptyCount;
-    const skippedNote = skipped ? ` ${skipped} location${skipped === 1 ? "" : "s"} had no usable data or could not be loaded.` : "";
+    const skippedNote = skipped
+      ? ` ${skipped} location${skipped === 1 ? "" : "s"} had no usable data or could not be loaded${batchTimedOut ? " before the batch time limit" : ""}.`
+      : "";
     const periodDescription = reportAggregation === "1month"
       ? "daily readings summarized for the selected month"
       : "daily readings for the selected day";
@@ -3472,11 +3539,13 @@ async function loadApiData() {
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
     const message = error.name === "AbortError"
-      ? "Sensor data loading timed out. Try fewer sensors, another month, or try again in a moment."
+      ? "Sensor data loading was canceled."
+      : error.name === "TimeoutError"
+        ? "The sensor API did not respond in time. Please try again in a moment."
       : (error.message || "Could not load API data.");
     setDataStatus(message, "error");
   } finally {
-    window.clearTimeout(timeoutId);
+    window.clearTimeout(batchTimeoutId);
     if (loadId === state.apiLoadId) {
       state.apiAbortController = null;
       if (button) button.disabled = false;
