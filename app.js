@@ -3102,7 +3102,8 @@ function buildApiReadingsUrl({ namespace, locationId, apiMetric, startDate, endD
   url.searchParams.set("metric", apiMetric);
   url.searchParams.set("start_date", startDate);
   url.searchParams.set("end_date", endDate);
-  url.searchParams.set("aggregation", aggregation || "1day");
+  const supportedAggregation = aggregation === "1min" || aggregation === "1hour" ? aggregation : "1day";
+  url.searchParams.set("aggregation", supportedAggregation);
   url.searchParams.set("_", String(Date.now()));
   return url.toString();
 }
@@ -3232,7 +3233,8 @@ async function loadApiData() {
   }
 
   const { start, end } = selectedDataDateRange();
-  const aggregation = els.apiAggregation?.value || "1day";
+  const reportAggregation = els.apiAggregation?.value || "1month";
+  const apiAggregation = reportAggregation === "1month" ? "1day" : reportAggregation;
   const requestedLocationValue = els.location.value;
 
   const button = els.loadApiBtn;
@@ -3245,7 +3247,7 @@ async function loadApiData() {
         apiConfig,
         start,
         end,
-        aggregation,
+        aggregation: apiAggregation,
         signal: state.apiAbortController.signal,
       }).then((result) => ({ selection, ...result }));
     }));
@@ -3299,7 +3301,10 @@ async function loadApiData() {
     const dateSpan = dateSpans.length ? dateSpans[0] : `${start} to ${end}`;
     const skipped = failed.length + emptyCount;
     const skippedNote = skipped ? ` ${skipped} location${skipped === 1 ? "" : "s"} had no usable data or could not be loaded.` : "";
-    setDataStatus(`Loaded ${totalRows} ${aggregation} readings for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).${skippedNote}`, "success");
+    const periodDescription = reportAggregation === "1month"
+      ? "daily readings summarized for the selected month"
+      : "daily readings for the selected day";
+    setDataStatus(`Loaded ${totalRows} ${periodDescription} for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).${skippedNote}`, "success");
     render();
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
@@ -3719,6 +3724,19 @@ function syncComparisonModeControls() {
   if (mode !== "existing") hideComparisonSearchResults();
 }
 
+function configureAggregationOptions(template) {
+  if (!els.apiAggregation) return;
+  const options = template === "snapshot"
+    ? [
+      { value: "1day", label: "1 day" },
+      { value: "1month", label: "1 month" },
+    ]
+    : [{ value: "1month", label: "1 month" }];
+  els.apiAggregation.replaceChildren(...options.map(({ value, label }) => (
+    new Option(label, value, value === options[0].value, value === options[0].value)
+  )));
+}
+
 function syncSnapshotAggregationControls() {
   if (!els.snapshotDayControl || !els.day || !els.monthControl || !els.month) return;
   const usesDailyAggregation = els.apiAggregation?.value !== "1month";
@@ -3732,6 +3750,7 @@ function syncSnapshotAggregationControls() {
 
 function setTemplate(template) {
   state.template = template;
+  configureAggregationOptions(template);
   if (template !== "trends") hideTrendTooltip();
   document.querySelectorAll(".template-tab").forEach((button) => {
     const active = button.dataset.template === template;
