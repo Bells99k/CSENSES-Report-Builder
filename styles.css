@@ -305,6 +305,15 @@ textarea.is-invalid {
   font-weight: 750;
 }
 
+.sensor-catalog-status.is-live {
+  color: #17653a;
+}
+
+.sensor-catalog-status.is-fallback {
+  color: #9a5b00;
+  font-weight: 700;
+}
+
 .custom-cluster-status {
   min-height: 1.2em;
   font-weight: 750;

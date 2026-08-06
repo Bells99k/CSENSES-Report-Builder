@@ -5,6 +5,7 @@ const state = {
   uploadedImage: null,
   builtInImages: {},
   sensorCatalog: [],
+  sensorCatalogSources: { aq: "loading", nu: "loading" },
   clusterCatalog: [],
   dataSource: "sample",
   comparisonLocations: [],
@@ -56,6 +57,7 @@ const els = {
   calendarMetric: document.getElementById("calendarMetric"),
   apiAggregation: document.getElementById("apiAggregation"),
   dataStatus: document.getElementById("dataStatus"),
+  sensorCatalogStatus: document.getElementById("sensorCatalogStatus"),
   loadApiBtn: document.getElementById("loadApiBtn"),
   sensorSearch: document.getElementById("sensorSearch"),
   sensorSearchBtn: document.getElementById("sensorSearchBtn"),
@@ -177,6 +179,49 @@ const legacyNuLocationIdBySensorId = {
   "26": "9",
   "49": "31",
   "54": "23",
+};
+
+// Last-known names from the API. These keep offline/fallback reports consistent
+// with the database instead of exposing the older shapefile spellings.
+const fallbackSensorNameByApiLocation = {
+  aq: {
+    "1": "Columbia Rd and Geneva St", "2": "Blue Hill Ave at Otisfield St",
+    "3": "Blue Hill Ave at Moreland St", "4": "Lewis Place",
+    "5": "Blue Hill Ave at Intervale St", "6": "Horatio Harris Park",
+    "7": "Blue Hill Ave at Grove Hall", "8": "Blue Hill Ave at Dudley Square Plaza",
+    "9": "Blue Hill Ave at Southwood St", "10": "Blue Hill Ave at Woodcliff St",
+    "11": "Seaver and Walnut", "12": "Kroc Center", "13": "Julian Street",
+    "14": "Trotter Elementary", "15": "Blue Hill Ave at Fayston St",
+    "16": "Elm Hill Ave and Wenonah St", "17": "Humboldt and Seaver",
+    "18": "Forest St and Vine St", "19": "Ruthven and Humboldt", "20": "Ceylon Park",
+    "21": "Elm Hill Park", "22": "Normandy St near Geneva Ave",
+    "23": "Marshfield St and Batchelder St", "24": "Plaza Borinquen",
+    "25": "Columbia Rd between Geneva and Washington", "26": "Normandy St at Oldfields Rd",
+  },
+  nu: {
+    "1": "Seaver St & Tiffany Moore Tot Park", "2": "Blue Hill @ Seaver St",
+    "3": "Dudley @ E. Cottage", "4": "Dudley @ Blue Hill (Dudley Commons)",
+    "5": "George @ Shirley", "6": "Waverly @ Warren", "7": "Kroc Centre",
+    "8": "Magnolia @ Lingard", "9": "Franklin Park", "10": "Magnolia @ Wayland",
+    "11": "Hollander st", "12": "Blue Hill @ Maywood", "13": "Blue Hill @ Quincy",
+    "15": "Moreland St @ Learning Together Day Care", "16": "Warren @ Townsend/Quincy",
+    "17": "Sargent St", "18": "Elm Hill Ave @ Seaver", "19": "Quincy @ Dacia",
+    "20": "Schuyler St", "21": "Blue Hill @ Columbia Road", "22": "Sonoma St",
+    "23": "Freedom House @ Warren St", "24": "Samuel W. Mason Elementary",
+    "25": "Geneva @ Blue Hill", "27": "Dunreath St", "28": "Other Dudley Commons",
+    "29": "Langdon St Farm", "30": "E. Cottage & Batchelder St",
+    "31": "Moreland St @ Howes Playground", "32": "Normandy and Stanwood",
+    "33": "Weldon St and Gannett St", "34": "Homestead and Harold",
+    "35": "Ruthven and Humboldt", "36": "Waumbeck and Warren",
+    "37": "Crawford (behind Crispus Attucks Children Center)",
+    "38": "Elm Hill and Crawford", "39": "Batchelder and Marshfield",
+    "40": "Hampden and Eustis", "41": "Forest St and Vine St",
+    "43": "W.Cottage and Brook", "44": "Washington St and Bishop Joe L. Smith",
+    "45": "Children's Park (Intervale and Normandy)", "46": "Bynoe Park",
+    "47": "Elm Hill and Cheney", "48": "Quincy and Magnolia", "50": "Warren Pl",
+    "51": "Normandy and Seaver", "52": "Winthrop Playground", "53": "Dennis St Park",
+    "55": "Fayston and Perth", "56": "Savin & Tupelo",
+  },
 };
 
 const metricLabels = {
@@ -703,8 +748,12 @@ function cleanSensorId(value) {
   return text;
 }
 
-function sensorListUrl(namespace) {
-  return `${sensorDataApiBaseUrl}/${namespace}/sensors-list`;
+function sensorListUrl(namespace, attempt = 1) {
+  const url = new URL(`${sensorDataApiBaseUrl}/${namespace}/sensors-list`);
+  // The API advertises a one-hour cache lifetime. Use a unique URL at startup so
+  // database edits to location names are reflected immediately in new reports.
+  url.searchParams.set("_", `${Date.now()}-${attempt}`);
+  return url.toString();
 }
 
 function sensorReadingsUrl(namespace) {
@@ -750,6 +799,8 @@ function catalogKeyedByLocation(catalog) {
       filterId: String(locationId),
       apiLocationId: String(locationId),
       displayId: sensorDisplayId(kind, locationId),
+      name: fallbackSensorNameByApiLocation[kind === "air" ? "aq" : "nu"]?.[locationId] || sensor.name,
+      catalogSource: sensor.catalogSource || "fallback",
     };
     const existing = locations.get(normalized.id);
     if (!existing || /\(removed\)/i.test(existing.name || "")) locations.set(normalized.id, normalized);
@@ -793,6 +844,7 @@ function normalizeRemoteSensorCatalog(payload, source) {
         apiLocationId: filterId,
         displayId: sensorDisplayId(kind, filterId),
         name,
+        catalogSource: "live",
         latitude: toNumber(sensor.latitude ?? sensor.lat) ?? fallback?.latitude ?? null,
         longitude: toNumber(sensor.longitude ?? sensor.lon ?? sensor.lng) ?? fallback?.longitude ?? null,
       };
@@ -802,18 +854,52 @@ function normalizeRemoteSensorCatalog(payload, source) {
 
 async function loadRemoteSensorCatalog() {
   const catalogGroups = await Promise.all(remoteSensorCatalogSources.map(async (source) => {
-    try {
-      const response = await fetchWithTimeout(sensorListUrl(source.namespace), {
-        cache: "no-store",
-        timeoutMs: catalogRequestTimeoutMs,
-      });
-      if (!response.ok) return [];
-      return normalizeRemoteSensorCatalog(await response.json(), source);
-    } catch {
-      return [];
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await fetchWithTimeout(sensorListUrl(source.namespace, attempt), {
+          cache: "no-store",
+          timeoutMs: catalogRequestTimeoutMs,
+        });
+        if (!response.ok) throw new Error(`${source.namespace.toUpperCase()} sensor list request failed with status ${response.status}`);
+        const sensors = normalizeRemoteSensorCatalog(await response.json(), source);
+        if (!sensors.length) throw new Error(`${source.namespace.toUpperCase()} sensor list response contained no sensors`);
+        state.sensorCatalogSources[source.namespace] = "live";
+        renderSensorCatalogStatus();
+        return sensors;
+      } catch (error) {
+        lastError = error;
+      }
     }
+    state.sensorCatalogSources[source.namespace] = "fallback";
+    renderSensorCatalogStatus();
+    console.warn(`CSENSES ${source.namespace.toUpperCase()} sensor list unavailable; using fallback locations.`, lastError);
+    return [];
   }));
   return catalogGroups.flat();
+}
+
+function renderSensorCatalogStatus() {
+  if (!els.sensorCatalogStatus) return;
+  const label = (namespace) => {
+    const source = state.sensorCatalogSources[namespace];
+    if (source === "live") return `${namespace.toUpperCase()} live endpoint`;
+    if (source === "fallback") return `${namespace.toUpperCase()} embedded fallback`;
+    return `${namespace.toUpperCase()} checking…`;
+  };
+  const usesFallback = Object.values(state.sensorCatalogSources).includes("fallback");
+  let selectedSource = "";
+  const selected = parseLocationValue(els.location?.value);
+  if (selected.kind === "sensor") {
+    const sensor = state.sensorCatalog.find((item) => item.id === selected.id);
+    if (sensor) {
+      const namespace = sensor.id.startsWith("air:") ? "AQ" : "NU";
+      selectedSource = ` Selected location: ${sensor.catalogSource === "live" ? `live ${namespace} endpoint` : "embedded fallback"}.`;
+    }
+  }
+  els.sensorCatalogStatus.textContent = `Sensor location names: ${label("aq")}; ${label("nu")}.${selectedSource}`;
+  els.sensorCatalogStatus.classList.toggle("is-fallback", usesFallback);
+  els.sensorCatalogStatus.classList.toggle("is-live", !usesFallback && Object.values(state.sensorCatalogSources).every((source) => source === "live"));
 }
 
 function normalizeRemoteClusterCatalog(payload) {
@@ -859,7 +945,11 @@ async function loadClusterCatalog() {
 async function loadSensorCatalog() {
   const remoteCatalog = await loadRemoteSensorCatalog();
   if (remoteCatalog.length) {
-    state.sensorCatalog = remoteCatalog;
+    // Keep fallback entries only for namespaces or individual locations that the
+    // API did not return. Live records win so their current names always appear.
+    const mergedCatalog = new Map(catalogKeyedByLocation(builtInSensorCatalog).map((sensor) => [sensor.id, sensor]));
+    remoteCatalog.forEach((sensor) => mergedCatalog.set(sensor.id, sensor));
+    state.sensorCatalog = Array.from(mergedCatalog.values());
     return;
   }
 
@@ -1318,6 +1408,7 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   if (!selectedValue) return;
   els.location.value = selectedValue;
   syncVisibleLocationSelects(selectedValue);
+  renderSensorCatalogStatus();
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
   syncPictureToSensorSelection(selectedValue);
   updateComparisonLocationOptions(selectedValue);
@@ -3850,6 +3941,7 @@ function updateText() {
 }
 
 function render() {
+  renderSensorCatalogStatus();
   updateText();
   renderCalendar();
   renderScene(els.reportScene);
