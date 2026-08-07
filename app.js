@@ -4311,11 +4311,29 @@ const pictureKeyBySensorName = new Map([
   ["Wenonah St and Elm Hill Ave", "elmHillWenonah"],
 ].map(([name, pictureKey]) => [normalizeSensorName(name), pictureKey]));
 
+// AQ location names can change in the database; photo associations should not.
+const airPictureKeyByApiLocationId = {
+  "1": "genevaBlueHill",
+  "11": "seaverWalnut",
+  "14": "trotterElementary",
+  "16": "elmHillWenonah",
+  "17": "humboldtSeaver",
+  "18": "forestVine",
+  "19": "ruthvenHumboldt",
+  "20": "ceylonPark",
+  "21": "elmHillPark",
+  "23": "marshfieldBatchelder",
+};
+
 function pictureKeyForSensorSelection(value) {
   const selection = selectedLocation(value, comparisonLocationOptions());
   if (selection.kind !== "sensor") return "";
   const catalogSensor = state.sensorCatalog.find((sensor) => sensor.id === selection.id);
   const sensorKind = String(catalogSensor?.id || selection.id || "").split(":")[0];
+  const apiLocationId = String(catalogSensor?.apiLocationId || catalogSensor?.filterId || selection.apiLocationId || selection.filterId || "");
+  if (sensorKind === "air" && airPictureKeyByApiLocationId[apiLocationId]) {
+    return airPictureKeyByApiLocationId[apiLocationId];
+  }
   const originalSensor = builtInSensorCatalog.find((sensor) => {
     return sensor.id.split(":")[0] === sensorKind &&
       normalizeSensorName(sensor.name) === normalizeSensorName(catalogSensor?.name || selection.display || selection.label);
@@ -4337,8 +4355,9 @@ function pictureKeyForSensorSelection(value) {
 }
 
 function syncPictureToSensorSelection(value) {
-  const pictureKey = pictureKeyForSensorSelection(value);
-  if (!pictureKey) return false;
+  const selection = selectedLocation(value, comparisonLocationOptions());
+  if (selection.kind !== "sensor") return false;
+  const pictureKey = pictureKeyForSensorSelection(value) || "grove";
   if (!Array.from(els.pictureSelect.options).some((option) => option.value === pictureKey)) {
     els.pictureSelect.replaceChildren(...pictureOptions.map(({ value: optionValue, label }) => (
       new Option(label, optionValue)
