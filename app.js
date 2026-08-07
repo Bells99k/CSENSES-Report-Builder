@@ -4274,7 +4274,9 @@ function registerBoxPhotoOptions() {
       const kind = item.id.split(":")[0];
       return (kind === "heat" || kind === "noise") && Number(item.filterId) === boxId;
     });
-    const label = sensor?.name ? `${sensor.name} (Box ${boxId})` : `Box ${boxId}`;
+    const apiLocationId = legacyNuLocationIdBySensorId[String(boxId)] || String(boxId);
+    const currentName = fallbackSensorNameByApiLocation.nu[apiLocationId] || sensor?.name;
+    const label = currentName ? `${currentName} (Box ${boxId})` : `Box ${boxId}`;
     els.pictureSelect.append(new Option(label, pictureKey));
   });
 }
