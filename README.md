@@ -52,8 +52,6 @@ GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebs
 
 The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise. Predefined clusters are loaded from the cluster list and retain their backend `cluster_id`; selecting one routes readings through the matching AQ or NU cluster endpoint.
 
-The sensor controls display whether each location name was loaded from the live AQ or NU endpoint or from the embedded fallback catalog.
-
 Response shape:
 
 ```json

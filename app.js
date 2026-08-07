@@ -5,7 +5,6 @@ const state = {
   uploadedImage: null,
   builtInImages: {},
   sensorCatalog: [],
-  sensorCatalogSources: { aq: "loading", nu: "loading" },
   clusterCatalog: [],
   dataSource: "sample",
   comparisonLocations: [],
@@ -57,7 +56,6 @@ const els = {
   calendarMetric: document.getElementById("calendarMetric"),
   apiAggregation: document.getElementById("apiAggregation"),
   dataStatus: document.getElementById("dataStatus"),
-  sensorCatalogStatus: document.getElementById("sensorCatalogStatus"),
   loadApiBtn: document.getElementById("loadApiBtn"),
   sensorSearch: document.getElementById("sensorSearch"),
   sensorSearchBtn: document.getElementById("sensorSearchBtn"),
@@ -800,7 +798,6 @@ function catalogKeyedByLocation(catalog) {
       apiLocationId: String(locationId),
       displayId: sensorDisplayId(kind, locationId),
       name: fallbackSensorNameByApiLocation[kind === "air" ? "aq" : "nu"]?.[locationId] || sensor.name,
-      catalogSource: sensor.catalogSource || "fallback",
     };
     const existing = locations.get(normalized.id);
     if (!existing || /\(removed\)/i.test(existing.name || "")) locations.set(normalized.id, normalized);
@@ -844,7 +841,6 @@ function normalizeRemoteSensorCatalog(payload, source) {
         apiLocationId: filterId,
         displayId: sensorDisplayId(kind, filterId),
         name,
-        catalogSource: "live",
         latitude: toNumber(sensor.latitude ?? sensor.lat) ?? fallback?.latitude ?? null,
         longitude: toNumber(sensor.longitude ?? sensor.lon ?? sensor.lng) ?? fallback?.longitude ?? null,
       };
@@ -864,42 +860,15 @@ async function loadRemoteSensorCatalog() {
         if (!response.ok) throw new Error(`${source.namespace.toUpperCase()} sensor list request failed with status ${response.status}`);
         const sensors = normalizeRemoteSensorCatalog(await response.json(), source);
         if (!sensors.length) throw new Error(`${source.namespace.toUpperCase()} sensor list response contained no sensors`);
-        state.sensorCatalogSources[source.namespace] = "live";
-        renderSensorCatalogStatus();
         return sensors;
       } catch (error) {
         lastError = error;
       }
     }
-    state.sensorCatalogSources[source.namespace] = "fallback";
-    renderSensorCatalogStatus();
     console.warn(`CSENSES ${source.namespace.toUpperCase()} sensor list unavailable; using fallback locations.`, lastError);
     return [];
   }));
   return catalogGroups.flat();
-}
-
-function renderSensorCatalogStatus() {
-  if (!els.sensorCatalogStatus) return;
-  const label = (namespace) => {
-    const source = state.sensorCatalogSources[namespace];
-    if (source === "live") return `${namespace.toUpperCase()} live endpoint`;
-    if (source === "fallback") return `${namespace.toUpperCase()} embedded fallback`;
-    return `${namespace.toUpperCase()} checking…`;
-  };
-  const usesFallback = Object.values(state.sensorCatalogSources).includes("fallback");
-  let selectedSource = "";
-  const selected = parseLocationValue(els.location?.value);
-  if (selected.kind === "sensor") {
-    const sensor = state.sensorCatalog.find((item) => item.id === selected.id);
-    if (sensor) {
-      const namespace = sensor.id.startsWith("air:") ? "AQ" : "NU";
-      selectedSource = ` Selected location: ${sensor.catalogSource === "live" ? `live ${namespace} endpoint` : "embedded fallback"}.`;
-    }
-  }
-  els.sensorCatalogStatus.textContent = `Sensor location names: ${label("aq")}; ${label("nu")}.${selectedSource}`;
-  els.sensorCatalogStatus.classList.toggle("is-fallback", usesFallback);
-  els.sensorCatalogStatus.classList.toggle("is-live", !usesFallback && Object.values(state.sensorCatalogSources).every((source) => source === "live"));
 }
 
 function normalizeRemoteClusterCatalog(payload) {
@@ -1408,7 +1377,6 @@ function updateClusterOptions(preferredCluster = els.location.value) {
   if (!selectedValue) return;
   els.location.value = selectedValue;
   syncVisibleLocationSelects(selectedValue);
-  renderSensorCatalogStatus();
   els.previewCluster.textContent = reportLocationDisplay(selectedValue);
   syncPictureToSensorSelection(selectedValue);
   updateComparisonLocationOptions(selectedValue);
@@ -3941,7 +3909,6 @@ function updateText() {
 }
 
 function render() {
-  renderSensorCatalogStatus();
   updateText();
   renderCalendar();
   renderScene(els.reportScene);
