@@ -1864,7 +1864,11 @@ function comparisonSeries() {
   return selectedComparisonLocations().map((locationValueToRead, index) => {
     const rows = monthRowsForLocation(locationValueToRead);
     const values = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
-    const peak = values.length ? Math.max(...values.map((row) => row[metric])) : null;
+    const peakRow = values.reduce((highest, row) => {
+      if (!highest || row[metric] > highest[metric]) return row;
+      return highest;
+    }, null);
+    const peak = peakRow?.[metric] ?? null;
     const average = values.length ? roundNumber(values.reduce((sum, row) => sum + row[metric], 0) / values.length) : null;
     return {
       key: locationValueToRead,
@@ -1872,6 +1876,7 @@ function comparisonSeries() {
       rows,
       values,
       peak,
+      peakRow,
       average,
       color: comparisonColors[index % comparisonColors.length],
     };
@@ -3635,10 +3640,18 @@ function updateComparisonSummary() {
   const comparedDays = Math.max(0, ...series.map((item) => item.values.length));
 
   document.getElementById("comparisonMetricTitle").innerHTML = `${metricNameHtml} by Location`;
-  document.getElementById("comparisonPeakLabel").innerHTML = `Highest daily average ${metricNameHtml}`;
-  document.getElementById("comparisonAverageLabel").innerHTML = `Highest monthly average ${metricNameHtml}`;
-  document.getElementById("comparisonPeakLocation").textContent = peak ? `${peak.cluster}: ${peak.peak} ${unit}` : "--";
-  document.getElementById("comparisonAverageLocation").textContent = average ? `${average.cluster}: ${average.average} ${unit}` : "--";
+  document.getElementById("comparisonPeakLabel").innerHTML = metric === "heat" && peak
+    ? `On ${escapeHtml(formatMonthDay(peak.peakRow.date))}, ${escapeHtml(peak.cluster)} had the highest daily average heat index at`
+    : `Highest daily average ${metricNameHtml}`;
+  document.getElementById("comparisonAverageLabel").innerHTML = metric === "heat" && average
+    ? `${escapeHtml(average.cluster)} had the highest monthly average heat index at`
+    : `Highest monthly average ${metricNameHtml}`;
+  document.getElementById("comparisonPeakLocation").textContent = peak
+    ? (metric === "heat" ? `${peak.peak} ${unit}` : `${peak.cluster}: ${peak.peak} ${unit}`)
+    : "--";
+  document.getElementById("comparisonAverageLocation").textContent = average
+    ? (metric === "heat" ? `${average.average} ${unit}` : `${average.cluster}: ${average.average} ${unit}`)
+    : "--";
   document.getElementById("comparisonCoverage").textContent = series.length ? `${series.length} locations / ${comparedDays} days` : "--";
 
   els.comparisonLegend.innerHTML = "";
