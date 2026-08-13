@@ -1919,6 +1919,13 @@ function heatSummaryStats(rows) {
 function metricSummaryStats(rows, metric) {
   const limits = thresholds();
   const metricRows = rows.filter((row) => row[metric] !== null && row[metric] !== undefined);
+  const exceedanceFloor = metric === "heat"
+    ? (heatIndexBands.find((band) => band.label === "Caution")?.min ?? limits.heat)
+    : limits[metric];
+  const peakRow = metricRows.reduce((peak, row) => {
+    if (!peak || row[metric] > peak[metric]) return row;
+    return peak;
+  }, null);
   const bands = new Map();
 
   metricRows.forEach((row) => {
@@ -1931,8 +1938,9 @@ function metricSummaryStats(rows, metric) {
   });
 
   return {
-    exceedanceDays: metricRows.filter((row) => row[metric] >= limits[metric]).length,
-    maxValue: metricRows.length ? Math.max(...metricRows.map((row) => row[metric])) : null,
+    exceedanceDays: metricRows.filter((row) => row[metric] >= exceedanceFloor).length,
+    maxValue: peakRow?.[metric] ?? null,
+    peakRow,
     topBand: Array.from(bands.values()).sort((a, b) => b.count - a.count)[0] || null,
   };
 }
@@ -2572,7 +2580,7 @@ function updateSensorMapDetails(sensors, selected) {
 
   const highlightedLegend = document.createElement("span");
   const highlightedSwatch = buildLegendSwatch({ highlighted: true });
-  highlightedLegend.append(highlightedSwatch, document.createTextNode("Highlighted in report"));
+  highlightedLegend.append(highlightedSwatch, document.createTextNode("Sensor(s) highlighted in report"));
   els.sensorMapLegend.append(highlightedLegend);
 
   const listSensors = selected.length ? selected : sensors.slice(0, 8);
@@ -3903,10 +3911,18 @@ function updateText() {
   const selectedMetricNameHtml = metricDisplayHtml(selectedMetric);
   const selectedMetricUnit = metricUnit(selectedMetric);
   const selectedMetricStats = metricSummaryStats(stats.rows, selectedMetric);
-  document.getElementById("metricSummaryLabel").innerHTML = `${selectedMetricNameHtml} exceedance days for ${escapeHtml(info.short)}.`;
-  document.getElementById("peakMetricSummaryLabel").innerHTML = `Highest daily average ${selectedMetricNameHtml} for ${escapeHtml(info.short)}.`;
+  const peakMetricNameHtml = selectedMetric === "heat" ? "heat index" : selectedMetricNameHtml;
+  document.getElementById("metricSummaryLabel").innerHTML = selectedMetric === "heat"
+    ? "Number of days that the daily average heat index was in the yellow “Caution” category or above."
+    : `${selectedMetricNameHtml} exceedance days for ${escapeHtml(info.short)}.`;
+  document.getElementById("peakMetricSummaryLabel").innerHTML = selectedMetricStats.peakRow
+    ? `${escapeHtml(formatMonthDay(selectedMetricStats.peakRow.date))} had the highest daily average ${peakMetricNameHtml} at`
+    : `No daily average ${peakMetricNameHtml} data for ${escapeHtml(info.short)}.`;
   document.getElementById("riskMetricSummaryLabel").innerHTML = `Most common ${selectedMetricNameHtml} standard category for ${escapeHtml(info.short)}.`;
-  document.getElementById("heatSummary").textContent = plural(selectedMetricStats.exceedanceDays, "exceedance day");
+  document.getElementById("heatSummary").textContent = plural(
+    selectedMetricStats.exceedanceDays,
+    selectedMetric === "heat" ? "day" : "exceedance day",
+  );
   document.getElementById("peakHeatSummary").textContent = selectedMetricStats.maxValue === null ? "--" : `${selectedMetricStats.maxValue} ${selectedMetricUnit}`;
   document.getElementById("dangerHeatSummary").textContent = selectedMetricStats.topBand ? `${selectedMetricStats.topBand.label}: ${plural(selectedMetricStats.topBand.count, "day")}` : "--";
   updateComparisonSummary();
