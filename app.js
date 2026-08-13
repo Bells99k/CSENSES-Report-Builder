@@ -94,7 +94,6 @@ const els = {
   sensorMapLegend: document.getElementById("sensorMapLegend"),
   sensorMapList: document.getElementById("sensorMapList"),
   sensorMapTitle: document.getElementById("sensorMapTitle"),
-  sensorMapMeta: document.getElementById("sensorMapMeta"),
   sensorPrintMap: document.getElementById("sensorPrintMap"),
   snapshotMapCanvas: document.getElementById("snapshotMapCanvas"),
   snapshotMapReset: document.getElementById("snapshotMapReset"),
@@ -2726,23 +2725,23 @@ function labelOverlapScore(candidate, placedLabels) {
   }, 0);
 }
 
-function drawHighlightedLabel(ctx, x, y, text, placedLabels = [], canvasWidth = 0, canvasHeight = 0) {
+function drawHighlightedLabel(ctx, x, y, text, placedLabels = [], canvasWidth = 0, canvasHeight = 0, fontSize = 15) {
   const safeText = cleanText(text) || "Selected sensor";
   ctx.save();
-  ctx.font = "700 15px Inter, sans-serif";
+  ctx.font = `700 ${fontSize}px Inter, sans-serif`;
   const textWidth = ctx.measureText(safeText).width;
-  const paddingX = 10;
+  const paddingX = Math.max(10, Math.round(fontSize * 0.5));
   const labelW = textWidth + paddingX * 2;
-  const labelH = 26;
+  const labelH = fontSize + 11;
   const offsets = [
-    { dx: 16, dy: -34 },
+    { dx: 16, dy: -labelH - 8 },
     { dx: 16, dy: 12 },
-    { dx: -labelW - 16, dy: -34 },
+    { dx: -labelW - 16, dy: -labelH - 8 },
     { dx: -labelW - 16, dy: 12 },
-    { dx: -labelW / 2, dy: -52 },
+    { dx: -labelW / 2, dy: -labelH - 26 },
     { dx: -labelW / 2, dy: 24 },
-    { dx: 26, dy: -64 },
-    { dx: -labelW - 26, dy: -64 },
+    { dx: 26, dy: -labelH - 38 },
+    { dx: -labelW - 26, dy: -labelH - 38 },
     { dx: 26, dy: 42 },
     { dx: -labelW - 26, dy: 42 },
   ];
@@ -2828,29 +2827,38 @@ function drawSnapshotSensorMarker(ctx, x, y, sensor, highlighted) {
   ctx.restore();
 }
 
-function niceScaleDistance(meters) {
-  if (!Number.isFinite(meters) || meters <= 0) return 100;
-  const exponent = Math.floor(Math.log10(meters));
-  const fraction = meters / (10 ** exponent);
+function niceScaleDistance(distance) {
+  if (!Number.isFinite(distance) || distance <= 0) return 1;
+  const exponent = Math.floor(Math.log10(distance));
+  const fraction = distance / (10 ** exponent);
   const niceFraction = fraction >= 5 ? 5 : fraction >= 2 ? 2 : 1;
   return niceFraction * (10 ** exponent);
 }
 
-function formatScaleDistance(meters) {
+function formatMetricScaleDistance(meters) {
   if (meters < 1000) return `${Math.round(meters)} m`;
   const kilometers = meters / 1000;
   return `${Number.isInteger(kilometers) ? kilometers : kilometers.toFixed(1)} km`;
 }
 
-function drawMapScaleBar(ctx, viewport, width, height) {
+function formatMilesScaleDistance(miles) {
+  const decimals = miles < 0.1 ? 2 : miles < 1 ? 1 : Number.isInteger(miles) ? 0 : 1;
+  return `${miles.toFixed(decimals)} mi`;
+}
+
+function drawMapScaleBar(ctx, viewport, width, height, units = "metric") {
   const centerLat = worldYToLat(viewport.top + height / 2, viewport.zoom);
   const metersPerPixel = Math.cos((centerLat * Math.PI) / 180) * 40075016.686 / (256 * (2 ** viewport.zoom));
   const targetPixels = width * 0.16;
-  const distanceMeters = niceScaleDistance(targetPixels * metersPerPixel);
+  const targetMeters = targetPixels * metersPerPixel;
+  const distanceMiles = units === "miles" ? niceScaleDistance(targetMeters / 1609.344) : null;
+  const distanceMeters = distanceMiles === null ? niceScaleDistance(targetMeters) : distanceMiles * 1609.344;
   const barWidth = Math.max(44, distanceMeters / metersPerPixel);
   const x = 28;
   const y = height - 54;
-  const label = formatScaleDistance(distanceMeters);
+  const label = distanceMiles === null
+    ? formatMetricScaleDistance(distanceMeters)
+    : formatMilesScaleDistance(distanceMiles);
 
   ctx.save();
   ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
@@ -2998,10 +3006,10 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
 
   const placedLabels = [];
   highlightedPoints.forEach((point) => {
-    drawHighlightedLabel(ctx, point.x, point.y, point.label, placedLabels, width, height);
+    drawHighlightedLabel(ctx, point.x, point.y, point.label, placedLabels, width, height, 24);
   });
 
-  drawMapScaleBar(ctx, viewport, width, height);
+  drawMapScaleBar(ctx, viewport, width, height, "miles");
   drawNorthArrow(ctx, width);
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
@@ -3019,11 +3027,8 @@ function renderSensorMap() {
 
   const sensors = mappedSensorsForMetric();
   const selected = selectedMappedSensors();
-  const author = els.author.value.trim() || "Name";
-  const reportDate = formatReportDate(els.reportDate.value) || currentReportDateLabel();
 
   els.sensorMapTitle.innerHTML = `${metricDisplayHtml(els.calendarMetric.value)} sensor locations`;
-  els.sensorMapMeta.textContent = `Prepared by ${author} on ${reportDate}`;
 
   const selectedIds = updateSensorMapDetails(sensors, selected);
   state.sensorPrintMapPromise = renderStaticSensorPrintMap(sensors, selectedIds, selected);
