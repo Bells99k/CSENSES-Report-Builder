@@ -3,6 +3,7 @@ const state = {
   rows: [],
   imageChoice: "grove",
   uploadedImage: null,
+  sensorPictureFallback: null,
   builtInImages: {},
   sensorCatalog: [],
   clusterCatalog: [],
@@ -236,22 +237,22 @@ const sensorMapFillColors = {
 
 const pictureAssets = {
   grove: "assets/Grove Hall.avif",
-  seaverWalnut: "Sensor Photos/AQ Seaver St and Walnut.jpg",
-  trotterElementary: "Sensor Photos/AQ Trotter Elementary.jpg",
-  ceylonPark: "Sensor Photos/Ceylon Park.jpg",
-  genevaBlueHill: "Sensor Photos/Columbia and Geneva AQ.jpg",
-  crawford: "Sensor Photos/Crawford btwn Harold & Humboldt Noise and Heat.jpg",
-  eastCottageBatchelder: "Sensor Photos/E. Cottage & Batchelder St.jpg",
-  elmHillPark: "Sensor Photos/Elm Hill Park.jpg",
-  elmHillCheney: "Sensor Photos/Elm Hill and Cheney.jpg",
-  forestVine: "Sensor Photos/Forest St and Vine St.jpg",
-  homesteadHarold: "Sensor Photos/Homestead and Harold Noise and Heat.jpg",
-  humboldtSeaver: "Sensor Photos/Humboldt Ave and Seaver St.jpg",
-  marshfieldBatchelder: "Sensor Photos/Marshfield St and Batchelder St.jpg",
-  normandyStanwood: "Sensor Photos/Normandy and Stanwood.jpg",
-  ruthvenHumboldt: "Sensor Photos/Ruthven and Humboldt.jpg",
-  waumbeckWarren: "Sensor Photos/Waumbeck and Warren Noise&Heat.jpg",
-  elmHillWenonah: "Sensor Photos/Wenonah St and Elm Hill Ave.jpg",
+  seaverWalnut: "Sensor Photos/web/AQ Seaver St and Walnut.jpg",
+  trotterElementary: "Sensor Photos/web/AQ Trotter Elementary.jpg",
+  ceylonPark: "Sensor Photos/web/Ceylon Park.jpg",
+  genevaBlueHill: "Sensor Photos/web/Columbia and Geneva AQ.jpg",
+  crawford: "Sensor Photos/web/Crawford btwn Harold & Humboldt Noise and Heat.jpg",
+  eastCottageBatchelder: "Sensor Photos/web/E. Cottage & Batchelder St.jpg",
+  elmHillPark: "Sensor Photos/web/Elm Hill Park.jpg",
+  elmHillCheney: "Sensor Photos/web/Elm Hill and Cheney.jpg",
+  forestVine: "Sensor Photos/web/Forest St and Vine St.jpg",
+  homesteadHarold: "Sensor Photos/web/Homestead and Harold Noise and Heat.jpg",
+  humboldtSeaver: "Sensor Photos/web/Humboldt Ave and Seaver St.jpg",
+  marshfieldBatchelder: "Sensor Photos/web/Marshfield St and Batchelder St.jpg",
+  normandyStanwood: "Sensor Photos/web/Normandy and Stanwood.jpg",
+  ruthvenHumboldt: "Sensor Photos/web/Ruthven and Humboldt.jpg",
+  waumbeckWarren: "Sensor Photos/web/Waumbeck and Warren Noise&Heat.jpg",
+  elmHillWenonah: "Sensor Photos/web/Wenonah St and Elm Hill Ave.jpg",
 };
 const boxPhotoIds = [...Array.from({ length: 53 }, (_, index) => index + 1), 55];
 boxPhotoIds.forEach((boxId) => {
@@ -2419,6 +2420,11 @@ function renderScene(canvas) {
     return;
   }
 
+  if (state.sensorPictureFallback) {
+    drawSensorPictureFallback(ctx, width, height, state.sensorPictureFallback);
+    return;
+  }
+
   const builtInImage = state.builtInImages[state.imageChoice] || loadPictureAsset(state.imageChoice);
   if (builtInImage?.complete && builtInImage.naturalWidth) {
     const scale = Math.max(width / builtInImage.width, height / builtInImage.height);
@@ -2460,6 +2466,55 @@ function renderScene(canvas) {
   ctx.fillStyle = "#181b1f";
   ctx.font = `700 ${Math.max(20, width * 0.035)}px Inter, sans-serif`;
   ctx.fillText("Grove Hall Sensor", width * 0.06, height * 0.88);
+}
+
+function drawSensorPictureFallback(ctx, width, height, fallback) {
+  const metricLabel = fallback.metric === "pm10" ? "PM10" : "PM2.5";
+  const gradient = ctx.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, "#eef2f4");
+  gradient.addColorStop(1, "#dce6df");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+
+  const sensorX = width * 0.18;
+  const sensorY = height * 0.48;
+  const sensorRadius = Math.min(width, height) * 0.15;
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#181b1f";
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(sensorX, sensorY, sensorRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = colors.teal;
+  ctx.beginPath();
+  ctx.arc(sensorX, sensorY, sensorRadius * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  const textX = width * 0.34;
+  const maxTextWidth = width * 0.6;
+  ctx.fillStyle = "#526069";
+  ctx.font = "800 21px Inter, sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(`${metricLabel} AIR-QUALITY SENSOR`, textX, height * 0.28);
+
+  ctx.fillStyle = "#181b1f";
+  ctx.font = "850 29px Inter, sans-serif";
+  const words = String(fallback.name || "Selected sensor").split(/\s+/);
+  const lines = [];
+  words.forEach((word) => {
+    const candidate = [...(lines.length ? [lines[lines.length - 1]] : []), word].join(" ");
+    if (!lines.length || ctx.measureText(candidate).width > maxTextWidth) lines.push(word);
+    else lines[lines.length - 1] = candidate;
+  });
+  lines.slice(0, 3).forEach((line, index) => {
+    ctx.fillText(line, textX, height * 0.44 + index * 38);
+  });
+
+  ctx.fillStyle = "#626b76";
+  ctx.font = "700 18px Inter, sans-serif";
+  ctx.fillText("Sensor photo not available", textX, height * 0.86);
 }
 
 function sensorKind(sensor) {
@@ -4294,6 +4349,7 @@ els.comparisonSearch.addEventListener("keydown", (event) => {
 });
 
 els.pictureSelect.addEventListener("change", () => {
+  state.sensorPictureFallback = null;
   state.imageChoice = els.pictureSelect.value;
   state.uploadedImage = null;
   els.imageUpload.value = "";
@@ -4350,6 +4406,7 @@ const pictureKeyBySensorName = new Map([
 // AQ location names can change in the database; photo associations should not.
 const airPictureKeyByApiLocationId = {
   "1": "genevaBlueHill",
+  "7": "grove",
   "11": "seaverWalnut",
   "14": "trotterElementary",
   "16": "elmHillWenonah",
@@ -4361,6 +4418,15 @@ const airPictureKeyByApiLocationId = {
   "23": "marshfieldBatchelder",
 };
 
+// Some AQ sensors are installed alongside NU sensor boxes. Use the existing
+// box deployment photo when there is no separate AQ photo for that location.
+const airBoxPhotoIdByApiLocationId = {
+  "8": 4,
+  "10": 12,
+  "12": 7,
+  "15": 13,
+};
+
 function pictureKeyForSensorSelection(value) {
   const selection = selectedLocation(value, comparisonLocationOptions());
   if (selection.kind !== "sensor") return "";
@@ -4369,6 +4435,10 @@ function pictureKeyForSensorSelection(value) {
   const apiLocationId = String(catalogSensor?.apiLocationId || catalogSensor?.filterId || selection.apiLocationId || selection.filterId || "");
   if (sensorKind === "air" && airPictureKeyByApiLocationId[apiLocationId]) {
     return airPictureKeyByApiLocationId[apiLocationId];
+  }
+  const airBoxPhotoId = airBoxPhotoIdByApiLocationId[apiLocationId];
+  if (sensorKind === "air" && boxPhotoIds.includes(airBoxPhotoId)) {
+    return `box${airBoxPhotoId}`;
   }
   const originalSensor = builtInSensorCatalog.find((sensor) => {
     return sensor.id.split(":")[0] === sensorKind &&
@@ -4393,14 +4463,35 @@ function pictureKeyForSensorSelection(value) {
 function syncPictureToSensorSelection(value) {
   const selection = selectedLocation(value, comparisonLocationOptions());
   if (selection.kind !== "sensor") return false;
-  const pictureKey = pictureKeyForSensorSelection(value) || "grove";
-  if (!Array.from(els.pictureSelect.options).some((option) => option.value === pictureKey)) {
+  const pictureKey = pictureKeyForSensorSelection(value);
+  const sensorKind = String(selection.id || "").split(":")[0];
+  if (!pictureKey && sensorKind === "air") {
+    const fallbackValue = "selectedAirSensorFallback";
+    let fallbackOption = Array.from(els.pictureSelect.options).find((option) => option.value === fallbackValue);
+    if (!fallbackOption) {
+      fallbackOption = new Option("Selected air-quality sensor (photo unavailable)", fallbackValue);
+      fallbackOption.disabled = true;
+      els.pictureSelect.prepend(fallbackOption);
+    }
+    els.pictureSelect.value = fallbackValue;
+    state.imageChoice = "";
+    state.sensorPictureFallback = {
+      metric: selectedHazardMetric(),
+      name: reportLocationDisplay(value),
+    };
+    state.uploadedImage = null;
+    els.imageUpload.value = "";
+    return true;
+  }
+  const resolvedPictureKey = pictureKey || "grove";
+  if (!Array.from(els.pictureSelect.options).some((option) => option.value === resolvedPictureKey)) {
     els.pictureSelect.replaceChildren(...pictureOptions.map(({ value: optionValue, label }) => (
       new Option(label, optionValue)
     )));
   }
-  els.pictureSelect.value = pictureKey;
-  state.imageChoice = pictureKey;
+  els.pictureSelect.value = resolvedPictureKey;
+  state.imageChoice = resolvedPictureKey;
+  state.sensorPictureFallback = null;
   state.uploadedImage = null;
   els.imageUpload.value = "";
   return true;
@@ -4441,6 +4532,7 @@ els.imageUpload.addEventListener("change", () => {
   reader.onload = () => {
     const image = new Image();
     image.onload = () => {
+      state.sensorPictureFallback = null;
       state.uploadedImage = image;
       render();
     };
