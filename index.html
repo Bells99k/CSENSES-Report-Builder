@@ -206,8 +206,9 @@
             </select>
           </label>
           <div class="sensor-search picture-search" role="search">
-            <input id="pictureSearch" type="search" placeholder="Search by sensor location" autocomplete="off" aria-label="Search pictures by sensor location name" aria-describedby="pictureSearchStatus">
+            <input id="pictureSearch" type="search" placeholder="Search by sensor location" autocomplete="off" aria-label="Search pictures by sensor location name" aria-describedby="pictureSearchStatus" aria-controls="pictureSearchResults" aria-expanded="false">
             <button id="pictureSearchBtn" type="button">Search</button>
+            <div id="pictureSearchResults" class="sensor-search-results" role="listbox" hidden></div>
           </div>
           <p class="hint picture-search-status" id="pictureSearchStatus" aria-live="polite"></p>
           <label>
@@ -519,6 +520,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260814-pm-sensor-pictures-v9"></script>
+    <script src="app.js?v=20260814-picture-results-v11"></script>
   </body>
 </html>

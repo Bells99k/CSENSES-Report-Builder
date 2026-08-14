@@ -47,6 +47,7 @@ const els = {
   pictureSelect: document.getElementById("pictureSelect"),
   pictureSearch: document.getElementById("pictureSearch"),
   pictureSearchBtn: document.getElementById("pictureSearchBtn"),
+  pictureSearchResults: document.getElementById("pictureSearchResults"),
   pictureSearchStatus: document.getElementById("pictureSearchStatus"),
   imageUpload: document.getElementById("imageUpload"),
   csvUpload: document.getElementById("csvUpload"),
@@ -4377,6 +4378,7 @@ const pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
   value: option.value,
   label: option.textContent,
 }));
+const selectedAirSensorFallbackValue = "selectedAirSensorFallback";
 
 const pictureKeyBySensorName = new Map([
   ["Seaver and Walnut", "seaverWalnut"],
@@ -4466,18 +4468,21 @@ function syncPictureToSensorSelection(value) {
   const pictureKey = pictureKeyForSensorSelection(value);
   const sensorKind = String(selection.id || "").split(":")[0];
   if (!pictureKey && sensorKind === "air") {
-    const fallbackValue = "selectedAirSensorFallback";
-    let fallbackOption = Array.from(els.pictureSelect.options).find((option) => option.value === fallbackValue);
+    const fallbackName = reportLocationDisplay(value);
+    const fallbackLabel = `${fallbackName} (photo unavailable)`;
+    let fallbackOption = Array.from(els.pictureSelect.options).find((option) => option.value === selectedAirSensorFallbackValue);
     if (!fallbackOption) {
-      fallbackOption = new Option("Selected air-quality sensor (photo unavailable)", fallbackValue);
+      fallbackOption = new Option(fallbackLabel, selectedAirSensorFallbackValue);
       fallbackOption.disabled = true;
       els.pictureSelect.prepend(fallbackOption);
+    } else {
+      fallbackOption.textContent = fallbackLabel;
     }
-    els.pictureSelect.value = fallbackValue;
+    els.pictureSelect.value = selectedAirSensorFallbackValue;
     state.imageChoice = "";
     state.sensorPictureFallback = {
       metric: selectedHazardMetric(),
-      name: reportLocationDisplay(value),
+      name: fallbackName,
     };
     state.uploadedImage = null;
     els.imageUpload.value = "";
@@ -4497,28 +4502,91 @@ function syncPictureToSensorSelection(value) {
   return true;
 }
 
-function searchPictures() {
+function hidePictureSearchResults() {
+  els.pictureSearchResults.hidden = true;
+  els.pictureSearch.setAttribute("aria-expanded", "false");
+}
+
+function selectPictureSearchResult(value, label) {
+  if (!Array.from(els.pictureSelect.options).some((option) => option.value === value)) return;
+  els.pictureSelect.value = value;
+  els.pictureSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  els.pictureSearch.value = label;
+  els.pictureSearchStatus.textContent = `Selected “${label}”.`;
+  hidePictureSearchResults();
+}
+
+function renderPictureSearchResults(matches) {
+  const selectableMatches = matches.filter(({ disabled = false }) => !disabled);
+  els.pictureSearchResults.innerHTML = "";
+
+  if (!selectableMatches.length) {
+    const empty = document.createElement("span");
+    empty.className = "sensor-search-empty";
+    empty.textContent = "No matching pictures";
+    els.pictureSearchResults.append(empty);
+  } else {
+    selectableMatches.forEach(({ value, label }) => {
+      const result = document.createElement("button");
+      result.type = "button";
+      result.className = "sensor-search-result";
+      result.setAttribute("role", "option");
+      result.dataset.value = value;
+      result.textContent = label;
+      result.addEventListener("click", () => selectPictureSearchResult(value, label));
+      els.pictureSearchResults.append(result);
+    });
+  }
+
+  els.pictureSearchResults.hidden = false;
+  els.pictureSearch.setAttribute("aria-expanded", "true");
+  return selectableMatches;
+}
+
+function searchPictures({ force = false } = {}) {
   const query = els.pictureSearch.value.trim().toLocaleLowerCase();
-  const matches = pictureOptions.filter(({ label }) => label.toLocaleLowerCase().includes(query));
-  const selectedValue = els.pictureSelect.value;
+  const availableOptions = state.sensorPictureFallback
+    ? [{
+      value: selectedAirSensorFallbackValue,
+      label: `${state.sensorPictureFallback.name} (photo unavailable)`,
+      disabled: true,
+    }, ...pictureOptions]
+    : pictureOptions;
+  const matches = availableOptions.filter(({ label }) => label.toLocaleLowerCase().includes(query));
+  const selectableMatches = matches.filter(({ disabled = false }) => !disabled);
+  const selectedValue = state.sensorPictureFallback
+    ? selectedAirSensorFallbackValue
+    : state.imageChoice;
 
-  els.pictureSelect.replaceChildren(...matches.map(({ value, label }) => new Option(label, value)));
-  if (matches.some(({ value }) => value === selectedValue)) els.pictureSelect.value = selectedValue;
+  els.pictureSelect.replaceChildren(...matches.map(({ value, label, disabled = false }) => {
+    const option = new Option(label, value);
+    option.disabled = disabled;
+    return option;
+  }));
+  if (matches.some(({ value }) => value === selectedValue)) {
+    els.pictureSelect.value = selectedValue;
+  } else {
+    els.pictureSelect.selectedIndex = -1;
+  }
 
-  if (!query) {
+  if (!query && !force) {
     els.pictureSearchStatus.textContent = "";
-  } else if (matches.length) {
-    els.pictureSearchStatus.textContent = `${matches.length} picture${matches.length === 1 ? "" : "s"} found.`;
+    hidePictureSearchResults();
+  } else if (selectableMatches.length) {
+    els.pictureSearchStatus.textContent = `${selectableMatches.length} picture${selectableMatches.length === 1 ? "" : "s"} found.`;
+    renderPictureSearchResults(matches);
   } else {
     els.pictureSearchStatus.textContent = `No pictures found for “${els.pictureSearch.value.trim()}”.`;
+    renderPictureSearchResults(matches);
   }
 }
 
-els.pictureSearchBtn?.addEventListener("click", searchPictures);
+els.pictureSearchBtn?.addEventListener("click", () => searchPictures({ force: true }));
+els.pictureSearch?.addEventListener("input", searchPictures);
 els.pictureSearch?.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
-    searchPictures();
+    searchPictures({ force: true });
   } else if (event.key === "Escape") {
     els.pictureSearch.value = "";
     searchPictures();
