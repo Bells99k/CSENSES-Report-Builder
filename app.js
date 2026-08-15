@@ -25,7 +25,6 @@ const state = {
   noteHtml: "",
   noteDirty: false,
   generatedNoteText: "",
-  snapshotTitleOverride: "Comparing Hazards Across Locations",
 };
 
 const els = {
@@ -88,6 +87,7 @@ const els = {
   previewCluster: document.getElementById("calendarLocation"),
   calendarGrid: document.getElementById("calendarGrid"),
   reportScene: document.getElementById("sceneCanvasReport"),
+  snapshotObservationAreas: document.getElementById("snapshotObservationAreas"),
   trendChart: document.getElementById("trendChart"),
   trendTooltip: document.getElementById("trendTooltip"),
   trendScene: document.getElementById("sceneCanvasTrends"),
@@ -99,7 +99,6 @@ const els = {
   sensorPrintMap: document.getElementById("sensorPrintMap"),
   snapshotMapCanvas: document.getElementById("snapshotMapCanvas"),
   snapshotMapReset: document.getElementById("snapshotMapReset"),
-  snapshotTitleEditable: document.getElementById("snapshotTitleEditable"),
 };
 
 const colors = {
@@ -2909,19 +2908,32 @@ function formatMilesScaleDistance(miles) {
   return `${miles.toFixed(decimals)} mi`;
 }
 
+function formatImperialScaleDistance(feet) {
+  if (feet < 1000) return `${Math.round(feet)} ft`;
+  const miles = feet / 5280;
+  return `${Number.isInteger(miles) ? miles : miles.toFixed(1)} mi`;
+}
+
 function drawMapScaleBar(ctx, viewport, width, height, units = "metric") {
   const centerLat = worldYToLat(viewport.top + height / 2, viewport.zoom);
   const metersPerPixel = Math.cos((centerLat * Math.PI) / 180) * 40075016.686 / (256 * (2 ** viewport.zoom));
   const targetPixels = width * 0.16;
   const targetMeters = targetPixels * metersPerPixel;
   const distanceMiles = units === "miles" ? niceScaleDistance(targetMeters / 1609.344) : null;
-  const distanceMeters = distanceMiles === null ? niceScaleDistance(targetMeters) : distanceMiles * 1609.344;
+  const distanceFeet = units === "imperial" ? niceScaleDistance(targetMeters * 3.28084) : null;
+  const distanceMeters = distanceFeet !== null
+    ? distanceFeet / 3.28084
+    : distanceMiles === null
+      ? niceScaleDistance(targetMeters)
+      : distanceMiles * 1609.344;
   const barWidth = Math.max(44, distanceMeters / metersPerPixel);
   const x = 28;
   const y = height - 54;
-  const label = distanceMiles === null
-    ? formatMetricScaleDistance(distanceMeters)
-    : formatMilesScaleDistance(distanceMiles);
+  const label = distanceFeet !== null
+    ? formatImperialScaleDistance(distanceFeet)
+    : distanceMiles === null
+      ? formatMetricScaleDistance(distanceMeters)
+      : formatMilesScaleDistance(distanceMiles);
 
   ctx.save();
   ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
@@ -3153,7 +3165,7 @@ async function renderSnapshotMap() {
   const height = canvas.height;
   const sensors = mappedSensorsForMetric();
   const selected = selectedMappedSensors();
-  const displaySensors = sensors;
+  const displaySensors = selected.length ? selected : sensors;
   const view = ensureSnapshotMapView(sensors, [], width, height);
   ctx.clearRect(0, 0, width, height);
 
@@ -3212,7 +3224,7 @@ async function renderSnapshotMap() {
 
   drawSnapshotPeriodLabel(ctx);
   drawNorthArrow(ctx, width);
-  drawMapScaleBar(ctx, { top, zoom }, width, height);
+  drawMapScaleBar(ctx, { top, zoom }, width, height, "imperial");
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
   ctx.fillRect(width - 286, height - 31, 276, 21);
@@ -3930,6 +3942,19 @@ function generatedNoteHtml(note, metric) {
   return `<p>${observationHtml}</p><p><strong>${escapeHtml(recommendation)}</strong></p>`;
 }
 
+function renderSnapshotObservationAreas(locationValues) {
+  const names = locationValues
+    .map((value) => reportLocationDisplay(value))
+    .filter((name, index, all) => name && all.indexOf(name) === index);
+  const labels = names.length ? names : ["No observation areas selected"];
+  els.snapshotObservationAreas.replaceChildren(...labels.map((label) => {
+    const item = document.createElement("li");
+    item.textContent = label;
+    return item;
+  }));
+  return names;
+}
+
 function updateText() {
   const info = monthInfo();
   const stats = exceedanceStats();
@@ -3950,12 +3975,15 @@ function updateText() {
   document.getElementById("trendCatchphrasePreview").textContent = catchphrase;
   document.getElementById("trendPhotoTitle").textContent = comparedLocationText;
   document.getElementById("trendMeta").textContent = `Prepared by ${author} on ${reportDate}`;
-  if (els.snapshotTitleEditable && document.activeElement !== els.snapshotTitleEditable) {
-    els.snapshotTitleEditable.textContent = state.snapshotTitleOverride || catchphrase;
-  }
+  document.getElementById("snapshotCatchphrasePreview").textContent = catchphrase;
   document.getElementById("snapshotMeta").textContent = `Prepared by ${author} on ${reportDate}`;
   document.getElementById("calendarMonth").textContent = info.long;
   document.getElementById("trendMonth").textContent = info.long;
+  document.getElementById("snapshotMapMonth").textContent = info.long;
+  const snapshotObservationAreaNames = renderSnapshotObservationAreas(comparedLocations);
+  document.getElementById("snapshotMapLocation").textContent = snapshotObservationAreaNames.length === 1
+    ? snapshotObservationAreaNames[0]
+    : `${snapshotObservationAreaNames.length} observation areas selected`;
   els.previewCluster.textContent = location;
   const generatedNote = buildGeneratedNote(info, location);
   if (noteCanUseGeneratedText()) {
@@ -4092,7 +4120,8 @@ function setupNoteEditor({ editor, toolbar, fontFamilySelect, fontSizeSelect, cl
 function syncLocationModeControls() {
   const mode = els.locationMode?.value || "sensor";
   document.querySelectorAll("[data-location-mode]").forEach((control) => {
-    control.hidden = state.template !== "composite" || control.dataset.locationMode !== mode;
+    const allowedTemplates = control.dataset.templateControl.split(/\s+/);
+    control.hidden = !allowedTemplates.includes(state.template) || control.dataset.locationMode !== mode;
   });
   if (mode !== "sensor") hideSensorSearchResults();
   if (mode !== "cluster") hideClusterSearchResults();
@@ -4645,9 +4674,6 @@ document.getElementById("printBtn").addEventListener("click", async () => {
 });
 
 setupSnapshotMapInteractions();
-els.snapshotTitleEditable?.addEventListener("input", () => {
-  state.snapshotTitleOverride = els.snapshotTitleEditable.textContent.trim() || null;
-});
 setCurrentPeriodDefaults();
 state.sensorCatalog = catalogKeyedByLocation(builtInSensorCatalog);
 state.clusterCatalog = builtInClusterCatalog.map((cluster) => ({ ...cluster }));

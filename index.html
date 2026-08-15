@@ -181,7 +181,7 @@
           <p class="hint data-status" id="dataStatus" aria-live="polite">Use sensor data for PM2.5, PM10, Heat Index, or Noise.</p>
         </section>
 
-        <section>
+        <section data-template-control="composite trends">
           <h2>Picture</h2>
           <label>
             Choose picture
@@ -427,12 +427,24 @@
                 <p class="template-label">Template 3</p>
               </div>
             </header>
-            <h2 id="snapshotTitleEditable" class="editable-title" contenteditable="true" role="textbox" aria-label="Site snapshot title" spellcheck="false">Comparing Hazards Across Locations</h2>
-            <p class="report-meta snapshot-meta-centered" id="snapshotMeta">Prepared by Name</p>
+            <div class="snapshot-hero-block">
+              <div class="report-catchphrase-column">
+                <p class="eyebrow">Catchphrase</p>
+                <h3 id="snapshotCatchphrasePreview">What's going on in Grove Hall?</h3>
+              </div>
+              <div class="snapshot-observation-areas">
+                <p class="eyebrow">Observation Areas</p>
+                <ul id="snapshotObservationAreas" class="snapshot-observation-list" aria-label="Selected observation areas">
+                  <li>Grove Hall</li>
+                </ul>
+              </div>
+              <p class="report-meta" id="snapshotMeta">Prepared by Name</p>
+            </div>
             <article class="panel snapshot-map-panel">
               <div class="calendar-heading calendar-heatmap-heading">
                 <div class="calendar-title-block">
-                  <h3>Sensor locations</h3>
+                  <h3 id="snapshotMapMonth">June 2026</h3>
+                  <p id="snapshotMapLocation" class="cluster-preview-text">Sample Cluster 1</p>
                   <p class="hint">Scroll or pinch to zoom, drag to pan.</p>
                 </div>
                 <div class="standards-wrap">
@@ -520,6 +532,6 @@
       </section>
     </main>
 
-    <script src="app.js?v=20260814-picture-results-v11"></script>
+    <script src="app.js?v=20260814-template-3-v14"></script>
   </body>
 </html>
