@@ -31,7 +31,7 @@ This repo includes `staticwebapp.config.json` for routing, CSV MIME handling, an
 
 ## Sensor API connection
 
-The browser calls the Common Senses sensor API directly. The Data panel's `Load sensor data` button builds the query from the current report controls:
+The browser calls the Common Senses sensor API directly. The Data panel's `Load sensor data` button builds the query from the current report controls. A custom-cluster builder can also use `Load selected data` to fetch readings for its selected sensors before the cluster is created:
 
 - Sensor or sensor cluster: must be a numbered AQ or NU sensor location.
 - What to Report: PM2.5 maps to AQ `pm25`; PM10 maps to AQ `pm10`; Heat Index maps to NU `heat_index`; Noise maps to NU `noise`.

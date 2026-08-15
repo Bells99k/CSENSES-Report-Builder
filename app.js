@@ -21,6 +21,8 @@ const state = {
   customClusters: [],
   customClusterDraftSensors: [],
   comparisonClusterDraftSensors: [],
+  customClusterActiveId: "",
+  comparisonClusterActiveId: "",
   customClusterCounter: 1,
   noteHtml: "",
   noteDirty: false,
@@ -67,14 +69,18 @@ const els = {
   customClusterName: document.getElementById("customClusterName"),
   customClusterSelect: document.getElementById("customClusterSelect"),
   customClusterAddBtn: document.getElementById("customClusterAddBtn"),
+  customClusterLoadBtn: document.getElementById("customClusterLoadBtn"),
   customClusterCreateBtn: document.getElementById("customClusterCreateBtn"),
+  customClusterNewBtn: document.getElementById("customClusterNewBtn"),
   customClusterSelected: document.getElementById("customClusterSelected"),
   customClusterStatus: document.getElementById("customClusterStatus"),
   comparisonMode: document.getElementById("comparisonMode"),
   comparisonClusterName: document.getElementById("comparisonClusterName"),
   comparisonClusterSelect: document.getElementById("comparisonClusterSelect"),
   comparisonClusterAddBtn: document.getElementById("comparisonClusterAddBtn"),
+  comparisonClusterLoadBtn: document.getElementById("comparisonClusterLoadBtn"),
   comparisonClusterCreateBtn: document.getElementById("comparisonClusterCreateBtn"),
+  comparisonClusterNewBtn: document.getElementById("comparisonClusterNewBtn"),
   comparisonClusterSelected: document.getElementById("comparisonClusterSelected"),
   comparisonClusterStatus: document.getElementById("comparisonClusterStatus"),
   comparisonSearch: document.getElementById("comparisonSearch"),
@@ -1414,20 +1420,26 @@ function clusterBuilderConfig(context = "composite") {
   if (context === "trends") {
     return {
       draftKey: "comparisonClusterDraftSensors",
+      activeIdKey: "comparisonClusterActiveId",
       name: els.comparisonClusterName,
       select: els.comparisonClusterSelect,
       addBtn: els.comparisonClusterAddBtn,
+      loadBtn: els.comparisonClusterLoadBtn,
       createBtn: els.comparisonClusterCreateBtn,
+      newBtn: els.comparisonClusterNewBtn,
       selected: els.comparisonClusterSelected,
       status: els.comparisonClusterStatus,
     };
   }
   return {
     draftKey: "customClusterDraftSensors",
+    activeIdKey: "customClusterActiveId",
     name: els.customClusterName,
     select: els.customClusterSelect,
     addBtn: els.customClusterAddBtn,
+    loadBtn: els.customClusterLoadBtn,
     createBtn: els.customClusterCreateBtn,
+    newBtn: els.customClusterNewBtn,
     selected: els.customClusterSelected,
     status: els.customClusterStatus,
   };
@@ -1507,13 +1519,29 @@ function renderCustomClusterBuilder(context = "composite") {
 
   const name = cleanText(config.name?.value || "");
   const canAddSensor = Boolean(config.select.options.length > 1);
+  const activeCluster = state.customClusters.find((cluster) => cluster.id === state[config.activeIdKey]);
+  const hasUnsavedChanges = Boolean(activeCluster && (
+    activeCluster.name !== name ||
+    activeCluster.metric !== els.calendarMetric.value ||
+    activeCluster.members.length !== state[config.draftKey].length ||
+    activeCluster.members.some((value, index) => value !== state[config.draftKey][index])
+  ));
   if (name) setCustomClusterNameError(context, false);
   if (config.addBtn) config.addBtn.disabled = !canAddSensor;
-  if (config.createBtn) config.createBtn.disabled = false;
+  if (config.loadBtn) config.loadBtn.disabled = !state[config.draftKey].length || Boolean(state.apiAbortController);
+  if (config.createBtn) {
+    config.createBtn.disabled = false;
+    config.createBtn.textContent = activeCluster ? "Update cluster" : "Create cluster";
+  }
+  if (config.newBtn) config.newBtn.hidden = !activeCluster;
   if (!state[config.draftKey].length) {
     setCustomClusterStatus(context, "Select at least two sensors to create a cluster.");
+  } else if (hasUnsavedChanges) {
+    setCustomClusterStatus(context, `${plural(state[config.draftKey].length, "sensor")} selected. Choose Update cluster to save these changes.`);
+  } else if (activeCluster) {
+    setCustomClusterStatus(context, `${activeCluster.name} remains selected with ${plural(state[config.draftKey].length, "sensor")}.`);
   } else {
-    setCustomClusterStatus(context, `${plural(state[config.draftKey].length, "sensor")} selected.`);
+    setCustomClusterStatus(context, `${plural(state[config.draftKey].length, "sensor")} selected. You can load their data before creating the cluster.`);
   }
 }
 
@@ -1550,15 +1578,17 @@ function createCustomCluster(context = "composite") {
     return;
   }
 
+  const activeCluster = state.customClusters.find((item) => item.id === state[config.activeIdKey]);
   const cluster = {
-    id: `custom-${state.customClusterCounter++}`,
+    id: activeCluster?.id || `custom-${state.customClusterCounter++}`,
     name,
     metric: els.calendarMetric.value,
     members: [...state[config.draftKey]],
   };
-  state.customClusters = [...state.customClusters, cluster];
-  state[config.draftKey] = [];
-  if (config.name) config.name.value = "";
+  state.customClusters = activeCluster
+    ? state.customClusters.map((item) => item.id === cluster.id ? cluster : item)
+    : [...state.customClusters, cluster];
+  state[config.activeIdKey] = cluster.id;
   setCustomClusterNameError(context, false);
 
   const customValue = locationValue("custom", cluster.id);
@@ -1570,13 +1600,23 @@ function createCustomCluster(context = "composite") {
     renderComparisonLocationOptions();
     render();
     renderCustomClusterBuilder("trends");
-    setCustomClusterStatus(context, `Created ${name} and added it to comparisons.`, "success");
+    setCustomClusterStatus(context, `${activeCluster ? "Updated" : "Created"} ${name} and kept its sensors visible in comparisons.`, "success");
     return;
   }
 
   updateClusterOptions(customValue);
   render();
-  setCustomClusterStatus(context, `Created ${name}.`, "success");
+  setCustomClusterStatus(context, `${activeCluster ? "Updated" : "Created"} ${name}. Its name and sensors will remain here.`, "success");
+}
+
+function startNewCustomCluster(context = "composite") {
+  const config = clusterBuilderConfig(context);
+  state[config.activeIdKey] = "";
+  state[config.draftKey] = [];
+  if (config.name) config.name.value = "";
+  setCustomClusterNameError(context, false);
+  renderCustomClusterBuilder(context);
+  config.name?.focus();
 }
 
 function matchingLocationOptions(query) {
@@ -3551,12 +3591,7 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
   }
 }
 
-function selectedLoadLocations(metric) {
-  const values = state.template === "snapshot"
-    ? mappedSensorsForMetric().map((sensor) => sensorLocationValue(sensor))
-    : state.template === "trends"
-      ? selectedComparisonLocations()
-      : [els.location.value];
+function loadLocationsForValues(values, metric) {
   return values
     .flatMap((value) => {
       const selection = selectedLocation(value);
@@ -3569,13 +3604,29 @@ function selectedLoadLocations(metric) {
     });
 }
 
+function selectedLoadLocations(metric) {
+  const values = state.template === "snapshot"
+    ? mappedSensorsForMetric().map((sensor) => sensorLocationValue(sensor))
+    : state.template === "trends"
+      ? selectedComparisonLocations()
+      : [els.location.value];
+  return loadLocationsForValues(values, metric);
+}
+
+function syncCustomClusterLoadButtons() {
+  ["composite", "trends"].forEach((context) => {
+    const { draftKey, loadBtn } = clusterBuilderConfig(context);
+    if (loadBtn) loadBtn.disabled = !state[draftKey].length || Boolean(state.apiAbortController);
+  });
+}
+
 function sensorTypeLabelForMetric(metric) {
   if (metric === "air" || metric === "pm10") return "air quality sensor";
   if (metric === "noise") return "noise sensor";
   return "heat sensor";
 }
 
-async function loadApiData() {
+async function loadApiData({ selectionValues = null, clusterContext = "" } = {}) {
   const loadId = state.apiLoadId + 1;
   state.apiLoadId = loadId;
   if (state.apiAbortController) state.apiAbortController.abort();
@@ -3584,16 +3635,23 @@ async function loadApiData() {
 
   const metric = els.calendarMetric.value;
   const apiConfig = sensorApiConfigForReportMetric(metric);
+  const setLoadStatus = (message, tone = "neutral") => {
+    setDataStatus(message, tone);
+    if (clusterContext) setCustomClusterStatus(clusterContext, message, tone);
+  };
   if (!apiConfig) {
     state.apiAbortController = null;
-    setDataStatus("Sensor data loading currently supports PM2.5, PM10, Heat Index, and Noise.", "error");
+    setLoadStatus("Sensor data loading currently supports PM2.5, PM10, Heat Index, and Noise.", "error");
     return;
   }
 
-  const selections = selectedLoadLocations(metric);
+  const selections = selectionValues
+    ? loadLocationsForValues(selectionValues, metric)
+    : selectedLoadLocations(metric);
+  const targetNoun = selectionValues ? "sensor" : "location";
   if (!selections.length) {
     state.apiAbortController = null;
-    setDataStatus(apiConfig.namespace === "aq"
+    setLoadStatus(apiConfig.namespace === "aq"
       ? "Choose one or more air quality sensors before loading PM data."
       : "Choose one or more numbered Heat or Noise sensors before loading sensor data.", "error");
     return;
@@ -3606,7 +3664,9 @@ async function loadApiData() {
 
   const button = els.loadApiBtn;
   if (button) button.disabled = true;
-  setDataStatus(`Loading ${metricDisplay(metric)} for ${selections.length} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
+  const builderLoadBtn = clusterContext ? clusterBuilderConfig(clusterContext).loadBtn : null;
+  if (builderLoadBtn) builderLoadBtn.disabled = true;
+  setLoadStatus(`Loading ${metricDisplay(metric)} for ${selections.length} selected ${targetNoun}${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
   let batchTimedOut = false;
   const batchTimeoutId = window.setTimeout(() => {
     batchTimedOut = true;
@@ -3684,7 +3744,7 @@ async function loadApiData() {
     const periodDescription = reportAggregation === "1month"
       ? "daily readings summarized for the selected month"
       : "daily readings for the selected day";
-    setDataStatus(`Loaded ${totalRows} ${periodDescription} for ${loaded.length} location${loaded.length === 1 ? "" : "s"} (${dateSpan}).${skippedNote}`, "success");
+    setLoadStatus(`Loaded ${totalRows} ${periodDescription} for ${loaded.length} ${targetNoun}${loaded.length === 1 ? "" : "s"} (${dateSpan}).${skippedNote}`, "success");
     render();
   } catch (error) {
     if (error.name === "AbortError" && loadId !== state.apiLoadId) return;
@@ -3693,12 +3753,13 @@ async function loadApiData() {
       : error.name === "TimeoutError"
         ? (error.message || sensorDataTimeoutMessage(apiRequestTimeoutMs))
       : (error.message || "Could not load API data.");
-    setDataStatus(message, "error");
+    setLoadStatus(message, "error");
   } finally {
     window.clearTimeout(batchTimeoutId);
     if (loadId === state.apiLoadId) {
       state.apiAbortController = null;
       if (button) button.disabled = false;
+      syncCustomClusterLoadButtons();
     }
   }
 }
@@ -4329,6 +4390,13 @@ els.customClusterAddBtn?.addEventListener("click", () => {
   addCustomClusterDraftSensor("composite");
 });
 
+els.customClusterLoadBtn?.addEventListener("click", () => {
+  loadApiData({
+    selectionValues: [...state.customClusterDraftSensors],
+    clusterContext: "composite",
+  });
+});
+
 els.customClusterSelect?.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
@@ -4343,8 +4411,19 @@ els.customClusterCreateBtn?.addEventListener("click", () => {
   createCustomCluster("composite");
 });
 
+els.customClusterNewBtn?.addEventListener("click", () => {
+  startNewCustomCluster("composite");
+});
+
 els.comparisonClusterAddBtn?.addEventListener("click", () => {
   addCustomClusterDraftSensor("trends");
+});
+
+els.comparisonClusterLoadBtn?.addEventListener("click", () => {
+  loadApiData({
+    selectionValues: [...state.comparisonClusterDraftSensors],
+    clusterContext: "trends",
+  });
 });
 
 els.comparisonClusterSelect?.addEventListener("keydown", (event) => {
@@ -4359,6 +4438,10 @@ els.comparisonClusterName?.addEventListener("input", () => {
 
 els.comparisonClusterCreateBtn?.addEventListener("click", () => {
   createCustomCluster("trends");
+});
+
+els.comparisonClusterNewBtn?.addEventListener("click", () => {
+  startNewCustomCluster("trends");
 });
 
 els.comparisonSearchBtn.addEventListener("click", () => {
