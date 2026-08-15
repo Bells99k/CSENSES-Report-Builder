@@ -747,12 +747,8 @@ function cleanSensorId(value) {
   return text;
 }
 
-function sensorListUrl(namespace, attempt = 1) {
-  const url = new URL(`${sensorDataApiBaseUrl}/${namespace}/sensors-list`);
-  // The API advertises a one-hour cache lifetime. Use a unique URL at startup so
-  // database edits to location names are reflected immediately in new reports.
-  url.searchParams.set("_", `${Date.now()}-${attempt}`);
-  return url.toString();
+function sensorListUrl(namespace) {
+  return `${sensorDataApiBaseUrl}/${namespace}/sensors-list`;
 }
 
 function sensorReadingsUrl(namespace) {
@@ -854,8 +850,8 @@ async function loadRemoteSensorCatalog() {
     let lastError = null;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        const response = await fetchWithTimeout(sensorListUrl(source.namespace, attempt), {
-          cache: "no-store",
+        const response = await fetchWithTimeout(sensorListUrl(source.namespace), {
+          cache: "default",
           timeoutMs: catalogRequestTimeoutMs,
         });
         if (!response.ok) throw new Error(`${source.namespace.toUpperCase()} sensor list request failed with status ${response.status}`);
@@ -891,10 +887,8 @@ async function loadClusterCatalog() {
   for (const sourceUrl of clusterListUrls()) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        const url = new URL(sourceUrl);
-        url.searchParams.set("_", `${Date.now()}-${attempt}`);
-        const response = await fetchWithTimeout(url, {
-          cache: "no-store",
+        const response = await fetchWithTimeout(sourceUrl, {
+          cache: "default",
           timeoutMs: catalogRequestTimeoutMs,
         });
         if (!response.ok) throw new Error(`Cluster list request failed with status ${response.status}`);
@@ -3400,7 +3394,6 @@ function buildApiReadingsUrl({ namespace, locationId, clusterId, apiMetric, star
   url.searchParams.set("end_date", endDate);
   const supportedAggregation = aggregation === "1min" || aggregation === "1hour" ? aggregation : "1day";
   url.searchParams.set("aggregation", supportedAggregation);
-  url.searchParams.set("_", String(Date.now()));
   return url.toString();
 }
 
@@ -3511,26 +3504,35 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
     aggregation,
   });
   console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, clusterId, apiMetric: apiConfig.metric, start, end, aggregation, url });
-  const response = await fetchWithTimeout(url, {
-    cache: "no-store",
-    signal,
-    timeoutMs: apiRequestTimeoutMs,
-  });
-  const payload = await response.json().catch(() => ({}));
-  console.info("CSENSES API response", {
-    status: response.status,
-    locationId: payload?.location_id,
-    clusterId: payload?.cluster_id,
-    metric: payload?.metric,
-    readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
-  });
-  if (!response.ok) {
-    throw new Error(payload?.error || `API request failed with status ${response.status}`);
+  try {
+    const response = await fetchWithTimeout(url, {
+      cache: "default",
+      signal,
+      timeoutMs: apiRequestTimeoutMs,
+    });
+    const payload = await response.json().catch(() => ({}));
+    console.info("CSENSES API response", {
+      status: response.status,
+      locationId: payload?.location_id,
+      clusterId: payload?.cluster_id,
+      metric: payload?.metric,
+      readings: Array.isArray(payload?.readings) ? payload.readings.length : 0,
+    });
+    if (!response.ok) {
+      throw new Error(payload?.error || `API request failed with status ${response.status}`);
+    }
+    return {
+      provider: apiConfig.namespace,
+      rows: normalizeApiRows(payload, { selection, apiConfig }),
+    };
+  } catch (error) {
+    if (clusterId && error?.name === "TimeoutError") {
+      const clusterError = new Error("The predefined-cluster service did not respond. Individual sensor locations are still available; the cluster aggregation API needs backend repair.");
+      clusterError.name = "ClusterTimeoutError";
+      throw clusterError;
+    }
+    throw error;
   }
-  return {
-    provider: apiConfig.namespace,
-    rows: normalizeApiRows(payload, { selection, apiConfig }),
-  };
 }
 
 function selectedLoadLocations(metric) {
@@ -3647,7 +3649,8 @@ async function loadApiData() {
       }
       if (abortError) throw abortError;
       const firstError = failed.find((item) => item.error)?.error;
-      throw new Error(firstError?.message || `No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
+      if (firstError) throw firstError;
+      throw new Error(`No data for the selected ${sensorTypeLabelForMetric(metric)} location${selections.length === 1 ? "" : "s"} from ${start} to ${end}. Try sensor location or another month.`);
     }
 
     state.dataSource = "api";

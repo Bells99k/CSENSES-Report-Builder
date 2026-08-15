@@ -4,9 +4,15 @@
     "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "strict-origin-when-cross-origin"
   },
+  "routes": [
+    {
+      "route": "/internal/*",
+      "statusCode": 404
+    }
+  ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/assets/*", "/*.{css,js,png,jpg,jpeg,svg,csv}"]
+    "exclude": ["/internal/*", "/assets/*", "/*.{css,js,png,jpg,jpeg,svg,csv}"]
   },
   "mimeTypes": {
     ".csv": "text/csv"

@@ -52,6 +52,37 @@ GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebs
 
 The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise. Predefined clusters are loaded from the cluster list and retain their backend `cluster_id`; selecting one routes readings through the matching AQ or NU cluster endpoint.
 
+### Loading performance and browser caching
+
+Catalog and readings URLs are stable and allow normal browser caching. The live readings API currently sends `Cache-Control: public, max-age=300`, so the browser may reuse an identical successful response for up to five minutes. The report builder does not maintain a separate long-lived readings cache and does not show a day-old response during an outage.
+
+Do not add timestamp query parameters or `cache: "no-store"` to the report builder's normal requests. Those options tell the browser that an identical recent response must not be reused.
+
+### Internal load diagnostics
+
+The timing chart is separate from the user-facing report builder. From this project folder, start the local server:
+
+```text
+node local-server.mjs
+```
+
+Then open:
+
+```text
+http://localhost:8000/internal/load-diagnostics.html
+```
+
+The diagnostic page can test an individual sensor or predefined cluster repeatedly, chart response time by attempt, retain the last 40 measurements in the local browser, and download the measurements as CSV. A single test can contain up to 20 attempts. Its print button produces a portrait one-page report containing the test configuration, line chart, and 20 most recent attempts. Diagnostic requests deliberately bypass caching so they measure the live API. `/internal/*` is configured to return 404 on the public Azure Static Web App and is available only from the local development server.
+
+### Predefined-cluster backend dependency
+
+Predefined clusters depend on the AQ and NU `/cluster-readings` endpoints. The cluster catalog currently provides only `cluster_id` and `cluster_name`; the sensor catalog and location metadata do not expose cluster membership. Therefore the browser cannot accurately rebuild a predefined cluster from individual `/readings` requests when `/cluster-readings` is unavailable.
+
+The report builder retains its existing limits: 45 seconds for an individual request and 90 seconds for the overall batch. A complete backend fix requires either:
+
+- repairing the `/aq/cluster-readings` and `/nu/cluster-readings` database queries; or
+- adding sensor membership to the cluster API, for example `members: { aq: [7, 14], nu: [25, 35] }`, so this frontend can fetch member readings and average them by day.
+
 Response shape:
 
 ```json

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSENSES Load Diagnostics</title>
+  <style>
+    :root { color-scheme: light; --ink: #181b1f; --muted: #66717a; --line: #c7d0d5; --teal: #226d68; --coral: #c45f4e; --amber: #b46b18; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef2f3; color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 32px auto; }
+    h1 { margin-bottom: 4px; }
+    .lede { margin-top: 0; color: var(--muted); }
+    .panel { margin-top: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .controls { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; }
+    label { display: grid; gap: 5px; font-size: 0.85rem; font-weight: 700; }
+    input, select, button { min-height: 38px; padding: 7px 9px; border: 1px solid #8c989e; border-radius: 6px; background: white; color: inherit; font: inherit; }
+    button { cursor: pointer; font-weight: 750; }
+    button:disabled { cursor: wait; opacity: 0.6; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .primary { border-color: var(--teal); background: var(--teal); color: white; }
+    #diagnosticStatus { min-height: 1.4em; font-weight: 700; }
+    #diagnosticChart { min-height: 260px; }
+    #diagnosticChart svg { display: block; width: 100%; height: auto; }
+    #diagnosticChart text { fill: var(--muted); font-size: 11px; }
+    .legend { display: flex; gap: 14px; color: var(--muted); font-size: 0.8rem; }
+    .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 50%; background: var(--teal); }
+    .legend .timeout::before { background: var(--coral); }
+    .legend .error::before { background: var(--amber); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th, td { padding: 8px; border-bottom: 1px solid #dce2e5; text-align: left; white-space: nowrap; }
+    th { background: #f5f7f7; }
+    .note { color: var(--muted); font-size: 0.82rem; }
+    .print-only { display: none; }
+    .print-result { display: none; }
+    @media (max-width: 760px) { .controls { grid-template-columns: repeat(2, minmax(130px, 1fr)); } }
+    @media (max-width: 460px) { .controls { grid-template-columns: 1fr; } }
+    @page { size: portrait; margin: 0.35in; }
+    @media print {
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      body { background: white; font-size: 9pt; }
+      main { width: auto; margin: 0; }
+      h1 { margin: 0 0 2px; font-size: 18pt; }
+      h2 { margin: 0 0 6px; font-size: 12pt; }
+      .lede { margin-bottom: 6px; }
+      .panel { margin-top: 7px; padding: 8px 10px; border-radius: 0; break-inside: avoid; }
+      .settings-panel { display: none; }
+      .print-only { display: block; margin: 3px 0; color: var(--muted); }
+      .print-configuration { padding: 7px 9px; border: 1px solid var(--line); }
+      .print-configuration h2 { color: var(--ink); }
+      .print-config-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px 12px; }
+      .print-config-grid div { min-width: 0; }
+      .print-config-grid span { display: block; font-size: 7pt; text-transform: uppercase; letter-spacing: 0.03em; }
+      .print-config-grid strong { display: block; overflow-wrap: anywhere; color: var(--ink); font-size: 8.5pt; }
+      #diagnosticChart { min-height: 0; }
+      #diagnosticChart svg { max-height: 2.55in; }
+      .legend { font-size: 8pt; }
+      table { table-layout: fixed; font-size: 7pt; }
+      th, td { padding: 3px 5px; }
+      td { overflow-wrap: anywhere; white-space: normal; }
+      th:nth-child(1) { width: 5%; }
+      th:nth-child(2) { width: 17%; }
+      th:nth-child(3) { width: 21%; }
+      th:nth-child(4) { width: 10%; }
+      th:nth-child(5) { width: 12%; }
+      th:nth-child(6) { width: 12%; }
+      th:nth-child(7) { width: 9%; }
+      th:nth-child(8) { width: 8%; }
+      .screen-result { display: none; }
+      .print-result { display: inline; }
+      tbody tr:nth-child(n+21) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CSENSES Load Diagnostics</h1>
+    <p class="lede">This measures live API response time without changing the report-builder interface.</p>
+    <p id="printDetails" class="print-only"></p>
+    <section class="print-only print-configuration" aria-labelledby="printConfigurationTitle">
+      <h2 id="printConfigurationTitle">Test configuration</h2>
+      <div class="print-config-grid">
+        <div><span>Sensor pipeline</span><strong id="printPipeline"></strong></div>
+        <div><span>Request type</span><strong id="printRequestType"></strong></div>
+        <div><span>Sensor/cluster ID</span><strong id="printTargetId"></strong></div>
+        <div><span>Metric</span><strong id="printMetric"></strong></div>
+        <div><span>Date range</span><strong id="printDateRange"></strong></div>
+        <div><span>Attempts requested</span><strong id="printAttemptCount"></strong></div>
+        <div><span>Timeout per attempt</span><strong id="printTimeout"></strong></div>
+        <div><span>Aggregation</span><strong>Daily</strong></div>
+      </div>
+    </section>
+
+    <section class="panel settings-panel" aria-labelledby="testSettingsTitle">
+      <h2 id="testSettingsTitle">Test settings</h2>
+      <div class="controls">
+        <label>Sensor pipeline
+          <select id="pipeline">
+            <option value="aq">Air quality (AQ)</option>
+            <option value="nu">Heat/noise (NU)</option>
+          </select>
+        </label>
+        <label>Request type
+          <select id="requestType">
+            <option value="readings">Individual sensor</option>
+            <option value="cluster-readings">Predefined cluster</option>
+          </select>
+        </label>
+        <label>Sensor or cluster ID
+          <input id="targetId" type="number" min="1" step="1" value="7">
+        </label>
+        <label>Metric
+          <select id="metric">
+            <option value="pm25">PM2.5</option>
+            <option value="pm10">PM10</option>
+          </select>
+        </label>
+        <label>Start date
+          <input id="startDate" type="date">
+        </label>
+        <label>End date
+          <input id="endDate" type="date">
+        </label>
+        <label>Attempts
+          <input id="attemptCount" type="number" min="1" max="20" value="3">
+        </label>
+        <label>Timeout per attempt (seconds)
+          <input id="timeoutSeconds" type="number" min="5" max="300" value="45">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="runDiagnostic" class="primary" type="button">Run diagnostic</button>
+        <button id="stopDiagnostic" type="button" disabled>Stop</button>
+        <button id="clearDiagnostic" type="button">Clear history</button>
+        <button id="downloadDiagnostic" type="button">Download CSV</button>
+        <button id="printDiagnostic" type="button">Print one-page report</button>
+      </div>
+      <p id="diagnosticStatus" aria-live="polite">Ready.</p>
+      <p class="note">Tests run sequentially and deliberately bypass browser caching so each point measures the live service. Results remain only in this browser.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="chartTitle">
+      <h2 id="chartTitle">Response time by attempt</h2>
+      <div class="legend"><span>Success</span><span class="timeout">Timeout</span><span class="error">Other error</span></div>
+      <div id="diagnosticChart" role="img" aria-label="No diagnostic attempts recorded"></div>
+      <p id="diagnosticSummary" class="note">Run a diagnostic to create the chart.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="resultsTitle">
+      <h2 id="resultsTitle">Recorded attempts</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Time</th><th>Target</th><th>Metric</th><th>Result</th><th>Duration</th><th>HTTP</th><th>Rows</th></tr></thead>
+          <tbody id="diagnosticRows"><tr><td colspan="8">No attempts recorded.</td></tr></tbody>
+        </table>
+      </div>
+      <p class="print-only">The printed table contains the 20 most recent attempts.</p>
+    </section>
+  </main>
+  <script src="load-diagnostics.js"></script>
+</body>
+</html>
