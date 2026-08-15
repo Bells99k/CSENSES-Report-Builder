@@ -3539,7 +3539,7 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
     };
   } catch (error) {
     if (clusterId && error?.name === "TimeoutError") {
-      const clusterError = new Error("The predefined-cluster service did not respond. Individual sensor locations are still available; the cluster aggregation API needs backend repair.");
+      const clusterError = new Error("API request timed out after 45 seconds. Retry loading the data. Refresh your browser page if the issue persists.");
       clusterError.name = "ClusterTimeoutError";
       throw clusterError;
     }
