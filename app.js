@@ -3409,6 +3409,10 @@ function buildApiReadingsUrl({ namespace, locationId, clusterId, apiMetric, star
   return url.toString();
 }
 
+function sensorDataTimeoutMessage(timeoutMs) {
+  return `The sensor data request timed out after ${Math.round(timeoutMs / 1000)} seconds. Try loading the data again. If the issue persists, refresh the page and retry.`;
+}
+
 async function fetchWithTimeout(resource, { timeoutMs = apiRequestTimeoutMs, signal, ...options } = {}) {
   const controller = new AbortController();
   let timedOut = false;
@@ -3424,7 +3428,7 @@ async function fetchWithTimeout(resource, { timeoutMs = apiRequestTimeoutMs, sig
     return await fetch(resource, { ...options, signal: controller.signal });
   } catch (error) {
     if (timedOut && error?.name === "AbortError") {
-      const timeoutError = new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds.`);
+      const timeoutError = new Error(sensorDataTimeoutMessage(timeoutMs));
       timeoutError.name = "TimeoutError";
       throw timeoutError;
     }
@@ -3539,7 +3543,7 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
     };
   } catch (error) {
     if (clusterId && error?.name === "TimeoutError") {
-      const clusterError = new Error("API request timed out after 45 seconds. Retry loading the data. Refresh your browser page if the issue persists.");
+      const clusterError = new Error(sensorDataTimeoutMessage(apiRequestTimeoutMs));
       clusterError.name = "ClusterTimeoutError";
       throw clusterError;
     }
@@ -3655,7 +3659,7 @@ async function loadApiData() {
     if (!loaded.length) {
       const abortError = failed.find((item) => item.error?.name === "AbortError")?.error;
       if (abortError && batchTimedOut) {
-        const timeoutError = new Error("The sensor API did not return any data within 90 seconds.");
+        const timeoutError = new Error(sensorDataTimeoutMessage(apiBatchTimeoutMs));
         timeoutError.name = "TimeoutError";
         throw timeoutError;
       }
@@ -3687,7 +3691,7 @@ async function loadApiData() {
     const message = error.name === "AbortError"
       ? "Sensor data loading was canceled."
       : error.name === "TimeoutError"
-        ? "The sensor API did not respond in time. Please try again in a moment."
+        ? (error.message || sensorDataTimeoutMessage(apiRequestTimeoutMs))
       : (error.message || "Could not load API data.");
     setDataStatus(message, "error");
   } finally {
