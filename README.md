@@ -78,7 +78,7 @@ The diagnostic page can test an individual sensor or predefined cluster repeated
 
 Predefined clusters depend on the AQ and NU `/cluster-readings` endpoints. The cluster catalog currently provides only `cluster_id` and `cluster_name`; the sensor catalog and location metadata do not expose cluster membership. Therefore the browser cannot accurately rebuild a predefined cluster from individual `/readings` requests when `/cluster-readings` is unavailable.
 
-The report builder retains its existing limits: 45 seconds for an individual request and 90 seconds for the overall batch. A complete backend fix requires either:
+The report builder allows up to 100 seconds for an individual request and 100 seconds for the overall batch. A complete backend fix requires either:
 
 - repairing the `/aq/cluster-readings` and `/nu/cluster-readings` database queries; or
 - adding sensor membership to the cluster API, for example `members: { aq: [7, 14], nu: [25, 35] }`, so this frontend can fetch member readings and average them by day.
