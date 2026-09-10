@@ -183,6 +183,9 @@
             <button id="loadApiBtn" type="button">Load sensor data</button>
           </div>
           <p class="hint data-status" id="dataStatus" aria-live="polite">Use sensor data for PM2.5, PM10, Heat Index, or Noise.</p>
+          <div id="dataLoadProgress" class="data-load-progress" role="progressbar" aria-label="Loading sensor data" hidden>
+            <span class="data-load-progress-fill"></span>
+          </div>
         </section>
 
         <section data-template-control="composite trends">

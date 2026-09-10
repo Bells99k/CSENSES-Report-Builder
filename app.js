@@ -59,6 +59,7 @@ const els = {
   calendarMetric: document.getElementById("calendarMetric"),
   apiAggregation: document.getElementById("apiAggregation"),
   dataStatus: document.getElementById("dataStatus"),
+  dataLoadProgress: document.getElementById("dataLoadProgress"),
   loadApiBtn: document.getElementById("loadApiBtn"),
   sensorSearch: document.getElementById("sensorSearch"),
   sensorSearchBtn: document.getElementById("sensorSearchBtn"),
@@ -1000,6 +1001,11 @@ function setDataStatus(message, tone = "neutral") {
   els.dataStatus.textContent = message;
   els.dataStatus.classList.toggle("is-error", tone === "error");
   els.dataStatus.classList.toggle("is-success", tone === "success");
+}
+
+function setDataLoadProgress(isLoading) {
+  if (els.dataLoadProgress) els.dataLoadProgress.hidden = !isLoading;
+  els.dataStatus?.setAttribute("aria-busy", String(isLoading));
 }
 
 function monthInfo() {
@@ -3632,6 +3638,7 @@ async function loadApiData({ selectionValues = null, clusterContext = "" } = {})
   if (state.apiAbortController) state.apiAbortController.abort();
   state.apiAbortController = new AbortController();
   const requestController = state.apiAbortController;
+  setDataLoadProgress(false);
 
   const metric = els.calendarMetric.value;
   const apiConfig = sensorApiConfigForReportMetric(metric);
@@ -3667,6 +3674,7 @@ async function loadApiData({ selectionValues = null, clusterContext = "" } = {})
   const builderLoadBtn = clusterContext ? clusterBuilderConfig(clusterContext).loadBtn : null;
   if (builderLoadBtn) builderLoadBtn.disabled = true;
   setLoadStatus(`Loading ${metricDisplay(metric)} for ${selections.length} selected ${targetNoun}${selections.length === 1 ? "" : "s"} from ${start} to ${end}...`);
+  setDataLoadProgress(true);
   let batchTimedOut = false;
   const batchTimeoutId = window.setTimeout(() => {
     batchTimedOut = true;
@@ -3757,6 +3765,7 @@ async function loadApiData({ selectionValues = null, clusterContext = "" } = {})
   } finally {
     window.clearTimeout(batchTimeoutId);
     if (loadId === state.apiLoadId) {
+      setDataLoadProgress(false);
       state.apiAbortController = null;
       if (button) button.disabled = false;
       syncCustomClusterLoadButtons();
