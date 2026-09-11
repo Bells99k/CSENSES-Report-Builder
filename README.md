@@ -8,9 +8,15 @@ Open `index.html` in a browser. No install step is required.
 
 ## Recommended online hosting
 
-Use Azure Static Web Apps for the public version.
+The public version is currently hosted with GitHub Pages:
 
-Why this fits the project:
+<https://bells99k.github.io/CSENSES-Report-Builder/>
+
+GitHub Pages works well for the current static frontend and provides free hosting, automatic publishing from GitHub, and HTTPS while the repository remains public.
+
+If the project later needs more hosting control, integrated authentication, or a private source repository, I recommend migrating it to Azure Static Web Apps.
+
+Why Azure Static Web Apps may fit a future deployment:
 
 - Free static hosting is available for this frontend.
 - GitHub commits can automatically deploy the site.
