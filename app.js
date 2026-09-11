@@ -125,7 +125,9 @@ const trendChartPadding = { left: 78, right: 30, top: 34, bottom: 66 };
 const noteWordLimit = 100;
 const defaultNoteText = "Type in your comments/stories/lived experience here (100 words max)";
 const sensorDataApiBaseUrl = "https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api";
-const mapTileBaseUrl = "https://a.basemaps.cartocdn.com/light_all";
+const cartoBasemapApiKey = "cb1_33rd_1_e0f4caaa34573892c061b037";
+const cartoBasemapSubdomains = "abcd";
+const mapTileUrlTemplate = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
 const apiRequestTimeoutMs = 100000;
 const apiBatchTimeoutMs = 100000;
 const catalogRequestTimeoutMs = 10000;
@@ -3052,6 +3054,16 @@ function snapshotPeriodLabel() {
   return formatReportDate(els.day?.value) || "Selected day";
 }
 
+function mapTileUrl(zoom, tileX, tileY) {
+  const subdomainIndex = Math.abs(tileX + tileY) % cartoBasemapSubdomains.length;
+  return mapTileUrlTemplate
+    .replace("{s}", cartoBasemapSubdomains[subdomainIndex])
+    .replace("{z}", String(zoom))
+    .replace("{x}", String(tileX))
+    .replace("{y}", String(tileY))
+    + `?key=${encodeURIComponent(cartoBasemapApiKey)}`;
+}
+
 function drawSnapshotPeriodLabel(ctx) {
   const label = snapshotPeriodLabel();
   ctx.save();
@@ -3102,7 +3114,7 @@ async function renderStaticSensorPrintMap(sensors, selectedIds, focusSensors = [
       tileJobs.push({
         x: tileX * 256 - viewport.left,
         y: tileY * 256 - viewport.top,
-        src: `${mapTileBaseUrl}/${viewport.zoom}/${tileX}/${tileY}.png`,
+        src: mapTileUrl(viewport.zoom, tileX, tileY),
       });
     }
   }
@@ -3235,7 +3247,7 @@ async function renderSnapshotMap() {
       tileJobs.push({
         x: tileX * 256 - left,
         y: tileY * 256 - top,
-        src: `${mapTileBaseUrl}/${zoom}/${tileX}/${tileY}.png`,
+        src: mapTileUrl(zoom, tileX, tileY),
       });
     }
   }
