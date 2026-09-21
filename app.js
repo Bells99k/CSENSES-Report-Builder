@@ -760,7 +760,7 @@ function sensorListUrl(namespace) {
 }
 
 function sensorReadingsUrl(namespace) {
-  return `${sensorDataApiBaseUrl}/${namespace}/readings`;
+  return `${sensorDataApiBaseUrl}/${namespace}/daily-readings`;
 }
 
 function clusterListUrl() {

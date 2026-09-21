@@ -80,6 +80,9 @@ function requestEndpoint(settings) {
   if (settings.requestType === "cluster-readings") {
     return "cluster-daily-readings";
   }
+  if (settings.requestType === "readings") {
+    return "daily-readings";
+  }
   return settings.requestType;
 }
 
