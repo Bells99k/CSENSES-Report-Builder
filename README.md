@@ -44,6 +44,8 @@ The browser calls the Common Senses sensor API directly. The Data panel's `Load 
 - Select month: maps to `start_date` and `end_date`.
 - Average period: maps to `aggregation`; the report UI loads `1day`.
 
+Template 3's one-day view requests through the following day because the daily APIs require `start_date` to be strictly before `end_date`. The browser filters the returned readings back to the selected day before adding them to the report.
+
 ```text
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/sensors-list
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/sensors-list

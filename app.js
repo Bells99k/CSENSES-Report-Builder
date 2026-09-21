@@ -3467,6 +3467,13 @@ function buildApiReadingsUrl({ namespace, locationId, clusterId, apiMetric, star
   return url.toString();
 }
 
+function nextIsoDate(dateString) {
+  const [year, month, day] = String(dateString).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 function sensorDataTimeoutMessage(timeoutMs) {
   return `The sensor data request timed out after ${Math.round(timeoutMs / 1000)} seconds. Try loading the data again. If the issue persists, refresh the page and retry.`;
 }
@@ -3568,16 +3575,29 @@ function mergeLoadedRows(nextRows, { selection, metric, startDate, endDate }) {
 async function fetchRowsForSelection(selection, { apiConfig, start, end, aggregation, signal }) {
   const clusterId = apiClusterId(selection);
   const locationId = clusterId ? "" : apiLocationId(selection);
+  // Daily endpoints require start_date to be strictly before end_date. For a
+  // one-day snapshot, include the following day in the request and discard it
+  // after normalization so the report still contains only the selected day.
+  const requestEnd = start === end ? nextIsoDate(end) : end;
   const url = buildApiReadingsUrl({
     namespace: apiConfig.namespace,
     locationId,
     clusterId,
     apiMetric: apiConfig.metric,
     startDate: start,
-    endDate: end,
+    endDate: requestEnd,
     aggregation,
   });
-  console.info("CSENSES API request", { namespace: apiConfig.namespace, locationId, clusterId, apiMetric: apiConfig.metric, start, end, aggregation, url });
+  console.info("CSENSES API request", {
+    namespace: apiConfig.namespace,
+    locationId,
+    clusterId,
+    apiMetric: apiConfig.metric,
+    start,
+    end: requestEnd,
+    aggregation,
+    url,
+  });
   try {
     const response = await fetchWithTimeout(url, {
       cache: "default",
@@ -3595,9 +3615,11 @@ async function fetchRowsForSelection(selection, { apiConfig, start, end, aggrega
     if (!response.ok) {
       throw new Error(payload?.error || `API request failed with status ${response.status}`);
     }
+    const rows = normalizeApiRows(payload, { selection, apiConfig })
+      .filter((row) => row.date >= start && row.date <= end);
     return {
       provider: apiConfig.namespace,
-      rows: normalizeApiRows(payload, { selection, apiConfig }),
+      rows,
     };
   } catch (error) {
     if (clusterId && error?.name === "TimeoutError") {
