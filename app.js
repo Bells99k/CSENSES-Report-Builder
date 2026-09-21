@@ -1062,6 +1062,10 @@ function metricDisplay(metric) {
   }[metric] || "Sensor reading";
 }
 
+function allSensorLocationsLabel(metric = selectedHazardMetric()) {
+  return `All ${metricDisplay(metric)} sensor locations`;
+}
+
 function metricDisplayHtml(metric) {
   return {
     air: "PM<sub>2.5</sub>",
@@ -1898,6 +1902,7 @@ function selectedComparisonLocations() {
     .map((location) => resolvePreferredLocation(location, options))
     .filter((location, index, all) => optionValues.has(location) && all.indexOf(location) === index);
   if (state.comparisonLocationsEdited) return selected.slice(0, 8);
+  if (state.template === "snapshot") return [];
   const defaults = defaultComparisonLocations(options);
   return [...defaults, ...selected.filter((location) => !defaults.includes(location))].slice(0, 8);
 }
@@ -3869,14 +3874,18 @@ function rowsForGeneratedNote(metric) {
     });
   }
 
-  const location = reportLocationDisplay() || "Sensor Site";
+  let location = reportLocationDisplay() || "Sensor Site";
   if (state.template === "snapshot") {
     const { start, end } = selectedDataDateRange();
-    const selection = selectedLocation();
+    const selections = selectedComparisonLocations().map((value) => comparisonOption(value));
+    const sensorValues = new Set(mappedSensorsForMetric().map((sensor) => sensorLocationValue(sensor)));
+    if (!selections.length) location = allSensorLocationsLabel();
     return averageRowsByDate(state.rows.filter((row) => (
       row.date >= start &&
       row.date <= end &&
-      rowMatchesLocation(row, selection)
+      (selections.length
+        ? selections.some((selection) => rowMatchesLocation(row, selection))
+        : sensorValues.has(row.locationValue))
     )))
       .filter((row) => row[metric] !== null && row[metric] !== undefined)
       .map((row) => ({ row, location }));
@@ -4054,13 +4063,13 @@ function renderSnapshotObservationAreas(locationValues) {
   const names = locationValues
     .map((value) => reportLocationDisplay(value))
     .filter((name, index, all) => name && all.indexOf(name) === index);
-  const labels = names.length ? names : ["No observation areas selected"];
+  const labels = names.length ? names : [allSensorLocationsLabel()];
   els.snapshotObservationAreas.replaceChildren(...labels.map((label) => {
     const item = document.createElement("li");
     item.textContent = label;
     return item;
   }));
-  return names;
+  return labels;
 }
 
 function updateText() {
@@ -4093,7 +4102,10 @@ function updateText() {
     ? snapshotObservationAreaNames[0]
     : `${snapshotObservationAreaNames.length} observation areas selected`;
   els.previewCluster.textContent = location;
-  const generatedNote = buildGeneratedNote(info, location);
+  const generatedNoteLocation = state.template === "snapshot" && !comparedLocations.length
+    ? allSensorLocationsLabel()
+    : location;
+  const generatedNote = buildGeneratedNote(info, generatedNoteLocation);
   if (noteCanUseGeneratedText()) {
     state.generatedNoteText = generatedNote;
     els.generalInfo.value = generatedNote;
@@ -4286,6 +4298,7 @@ function setTemplate(template) {
   });
   syncLocationModeControls();
   syncComparisonModeControls();
+  renderComparisonSelected();
   syncSnapshotAggregationControls();
   if (template === "snapshot") {
     state.snapshotMapView.initialized = false;

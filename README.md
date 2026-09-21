@@ -46,6 +46,8 @@ The browser calls the Common Senses sensor API directly. The Data panel's `Load 
 
 Template 3's one-day view requests through the following day because the daily APIs require `start_date` to be strictly before `end_date`. The browser filters the returned readings back to the selected day before adding them to the report.
 
+Template 3 loads and displays every mapped sensor for the selected metric by default. Adding an explicit comparison location narrows the map to the selected location or locations; Template 2 keeps its normal default comparison location.
+
 ```text
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/sensors-list
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/sensors-list
