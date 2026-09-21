@@ -77,7 +77,7 @@ function durationLabel(durationMs) {
 }
 
 function requestEndpoint(settings) {
-  if (settings.pipeline === "nu" && settings.requestType === "cluster-readings") {
+  if (settings.requestType === "cluster-readings") {
     return "cluster-daily-readings";
   }
   return settings.requestType;

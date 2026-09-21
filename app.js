@@ -778,8 +778,7 @@ function clusterListUrls() {
 }
 
 function clusterReadingsUrl(namespace) {
-  const endpoint = namespace === "nu" ? "cluster-daily-readings" : "cluster-readings";
-  return `${sensorDataApiBaseUrl}/${namespace}/${endpoint}`;
+  return `${sensorDataApiBaseUrl}/${namespace}/cluster-daily-readings`;
 }
 
 function sensorDisplayId(kind, filterId) {
