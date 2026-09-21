@@ -52,11 +52,12 @@ GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebs
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/readings?location_id=5&metric=heat_index&start_date=2026-01-01&end_date=2026-01-31&aggregation=1day
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/cluster-readings?cluster_id=7&metric=pm25&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
 GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/aq/cluster-readings?cluster_id=7&metric=pm10&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
-GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-readings?cluster_id=7&metric=heat_index&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
-GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-readings?cluster_id=7&metric=noise&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-daily-readings?cluster_id=7&metric=heat_index&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-daily-readings?cluster_id=7&metric=noise&start_date=2026-04-01&end_date=2026-04-07&aggregation=1day
+GET https://sensordata-func-api-prd-ue2-01-d4hrdscjdcaxhugc.eastus2-01.azurewebsites.net/api/nu/cluster-daily-readings?cluster_id=7&metric=temperature&start_date=2026-04-01&end_date=2026-04-15&aggregation=1day
 ```
 
-The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise. Predefined clusters are loaded from the cluster list and retain their backend `cluster_id`; selecting one routes readings through the matching AQ or NU cluster endpoint.
+The report UI uses the Common Senses AQ endpoint for PM2.5 and PM10. The NU endpoint supports `heat_index`, `noise`, `temperature`, and `humidity`; this report UI uses it for Heat Index and Noise. Predefined clusters are loaded from the cluster list and retain their backend `cluster_id`; selecting one routes AQ readings through `/aq/cluster-readings` and Heat/Noise readings through `/nu/cluster-daily-readings`.
 
 ### Loading performance and browser caching
 
@@ -82,11 +83,11 @@ The diagnostic page can test an individual sensor or predefined cluster repeated
 
 ### Predefined-cluster backend dependency
 
-Predefined clusters depend on the AQ and NU `/cluster-readings` endpoints. The cluster catalog currently provides only `cluster_id` and `cluster_name`; the sensor catalog and location metadata do not expose cluster membership. Therefore the browser cannot accurately rebuild a predefined cluster from individual `/readings` requests when `/cluster-readings` is unavailable.
+Predefined clusters depend on the AQ `/cluster-readings` and NU `/cluster-daily-readings` endpoints. The cluster catalog currently provides only `cluster_id` and `cluster_name`; the sensor catalog and location metadata do not expose cluster membership. Therefore the browser cannot accurately rebuild a predefined cluster from individual `/readings` requests when its cluster endpoint is unavailable.
 
 The report builder allows up to 100 seconds for an individual request and 100 seconds for the overall batch. A complete backend fix requires either:
 
-- repairing the `/aq/cluster-readings` and `/nu/cluster-readings` database queries; or
+- repairing the `/aq/cluster-readings` or `/nu/cluster-daily-readings` database query; or
 - adding sensor membership to the cluster API, for example `members: { aq: [7, 14], nu: [25, 35] }`, so this frontend can fetch member readings and average them by day.
 
 Response shape:

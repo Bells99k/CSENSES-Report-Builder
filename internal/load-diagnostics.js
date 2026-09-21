@@ -76,8 +76,15 @@ function durationLabel(durationMs) {
   return seconds < 10 ? `${seconds.toFixed(2)} s` : `${seconds.toFixed(1)} s`;
 }
 
+function requestEndpoint(settings) {
+  if (settings.pipeline === "nu" && settings.requestType === "cluster-readings") {
+    return "cluster-daily-readings";
+  }
+  return settings.requestType;
+}
+
 function buildUrl(settings, attemptNumber) {
-  const url = new URL(`${apiBaseUrl}/${settings.pipeline}/${settings.requestType}`);
+  const url = new URL(`${apiBaseUrl}/${settings.pipeline}/${requestEndpoint(settings)}`);
   url.searchParams.set(settings.requestType === "cluster-readings" ? "cluster_id" : "location_id", settings.targetId);
   url.searchParams.set("metric", settings.metric);
   url.searchParams.set("start_date", settings.startDate);
@@ -153,7 +160,7 @@ async function runAttempt(settings, sequence, parentSignal) {
   return {
     number: history.reduce((largest, attempt) => Math.max(largest, Number(attempt.number) || 0), 0) + 1,
     recordedAt: new Date().toISOString(),
-    target: `${settings.pipeline}/${settings.requestType} ${settings.targetId}`,
+    target: `${settings.pipeline}/${requestEndpoint(settings)} ${settings.targetId}`,
     pipeline: settings.pipeline,
     requestType: settings.requestType,
     targetId: settings.targetId,
