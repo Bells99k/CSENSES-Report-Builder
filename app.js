@@ -188,49 +188,6 @@ const legacyNuLocationIdBySensorId = {
   "54": "23",
 };
 
-// Last-known names from the API. These keep offline/fallback reports consistent
-// with the database instead of exposing the older shapefile spellings.
-const fallbackSensorNameByApiLocation = {
-  aq: {
-    "1": "Columbia Rd and Geneva St", "2": "Blue Hill Ave at Otisfield St",
-    "3": "Blue Hill Ave at Moreland St", "4": "Lewis Place",
-    "5": "Blue Hill Ave at Intervale St", "6": "Horatio Harris Park",
-    "7": "Blue Hill Ave at Grove Hall", "8": "Blue Hill Ave at Dudley Square Plaza",
-    "9": "Blue Hill Ave at Southwood St", "10": "Blue Hill Ave at Woodcliff St",
-    "11": "Seaver and Walnut", "12": "Kroc Center", "13": "Julian Street",
-    "14": "Trotter Elementary", "15": "Blue Hill Ave at Fayston St",
-    "16": "Elm Hill Ave and Wenonah St", "17": "Humboldt and Seaver",
-    "18": "Forest St and Vine St", "19": "Ruthven and Humboldt", "20": "Ceylon Park",
-    "21": "Elm Hill Park", "22": "Normandy St near Geneva Ave",
-    "23": "Marshfield St and Batchelder St", "24": "Plaza Borinquen",
-    "25": "Columbia Rd between Geneva and Washington", "26": "Normandy St at Oldfields Rd",
-  },
-  nu: {
-    "1": "Seaver St & Tiffany Moore Tot Park", "2": "Blue Hill @ Seaver St",
-    "3": "Dudley @ E. Cottage", "4": "Dudley @ Blue Hill (Dudley Commons)",
-    "5": "George @ Shirley", "6": "Waverly @ Warren", "7": "Kroc Centre",
-    "8": "Magnolia @ Lingard", "9": "Franklin Park", "10": "Magnolia @ Wayland",
-    "11": "Hollander st", "12": "Blue Hill @ Maywood", "13": "Blue Hill @ Quincy",
-    "15": "Moreland St @ Learning Together Day Care", "16": "Warren @ Townsend/Quincy",
-    "17": "Sargent St", "18": "Elm Hill Ave @ Seaver", "19": "Quincy @ Dacia",
-    "20": "Schuyler St", "21": "Blue Hill @ Columbia Road", "22": "Sonoma St",
-    "23": "Freedom House @ Warren St", "24": "Samuel W. Mason Elementary",
-    "25": "Geneva @ Blue Hill", "27": "Dunreath St", "28": "Other Dudley Commons",
-    "29": "Langdon St Farm", "30": "E. Cottage & Batchelder St",
-    "31": "Moreland St @ Howes Playground", "32": "Normandy and Stanwood",
-    "33": "Weldon St and Gannett St", "34": "Homestead and Harold",
-    "35": "Ruthven and Humboldt", "36": "Waumbeck and Warren",
-    "37": "Crawford (behind Crispus Attucks Children Center)",
-    "38": "Elm Hill and Crawford", "39": "Batchelder and Marshfield",
-    "40": "Hampden and Eustis", "41": "Forest St and Vine St",
-    "43": "W.Cottage and Brook", "44": "Washington St and Bishop Joe L. Smith",
-    "45": "Children's Park (Intervale and Normandy)", "46": "Bynoe Park",
-    "47": "Elm Hill and Cheney", "48": "Quincy and Magnolia", "50": "Warren Pl",
-    "51": "Normandy and Seaver", "52": "Winthrop Playground", "53": "Dennis St Park",
-    "55": "Fayston and Perth", "56": "Savin & Tupelo",
-  },
-};
-
 const metricLabels = {
   composite: "Composite hazard severity",
   air: "PM2.5",
@@ -396,30 +353,6 @@ const builtInSensorCatalog = [
   {"group": "Heat Sensors", "id": "heat:54", "filterId": "54", "displayId": "Heat Sensor 54", "name": "Freedom House Warren St", "latitude": 42.3108226, "longitude": -71.0832951},
   {"group": "Heat Sensors", "id": "heat:55", "filterId": "55", "displayId": "Heat Sensor 55", "name": "Fayston and Perth", "latitude": 42.31298, "longitude": -71.07653},
   {"group": "Heat Sensors", "id": "heat:9", "filterId": "9", "displayId": "Heat Sensor 9", "name": "Savin & Tupelo", "latitude": 42.3167, "longitude": -71.08095},
-];
-const sensorCatalogSources = [
-  {
-    kind: "air",
-    label: "Air Quality Sensors",
-    path: "Air_Quality_Sensors/Air_Quality_Sensors.dbf",
-    idField: "SensorID",
-    nameField: "LocationNa",
-    typeField: "SensorType",
-  },
-  {
-    kind: "noise",
-    label: "Noise Sensors",
-    path: "Noise_Sensors/NoiseSensors.dbf",
-    idField: "Sound_sens",
-    nameField: "Location",
-  },
-  {
-    kind: "heat",
-    label: "Heat Sensors",
-    path: "Heat_Sensors_Shapefile/Heat_Sensors_Shapefile.dbf",
-    idField: "T__RH_sens",
-    nameField: "Location",
-  },
 ];
 const remoteSensorCatalogSources = [
   { namespace: "aq", kinds: ["air"], label: "Air Quality Sensors" },
@@ -788,28 +721,6 @@ function sensorDisplayId(kind, filterId) {
   return `Location ${filterId}`;
 }
 
-function catalogKeyedByLocation(catalog) {
-  const locations = new Map();
-  catalog.forEach((sensor) => {
-    const kind = String(sensor.id || "").split(":")[0];
-    const locationId = kind === "air"
-      ? legacyAqLocationIdByFilterId[sensor.filterId] || sensor.apiLocationId || sensor.filterId
-      : legacyNuLocationIdBySensorId[sensor.filterId] || sensor.apiLocationId || sensor.filterId;
-    if (!kind || !locationId) return;
-    const normalized = {
-      ...sensor,
-      id: `${kind}:${locationId}`,
-      filterId: String(locationId),
-      apiLocationId: String(locationId),
-      displayId: sensorDisplayId(kind, locationId),
-      name: fallbackSensorNameByApiLocation[kind === "air" ? "aq" : "nu"]?.[locationId] || sensor.name,
-    };
-    const existing = locations.get(normalized.id);
-    if (!existing || /\(removed\)/i.test(existing.name || "")) locations.set(normalized.id, normalized);
-  });
-  return Array.from(locations.values());
-}
-
 function normalizeSensorName(value) {
   return cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -835,8 +746,8 @@ function normalizeRemoteSensorCatalog(payload, source) {
   const sensors = Array.isArray(payload?.sensors) ? payload.sensors : (Array.isArray(payload) ? payload : []);
   return sensors.flatMap((sensor) => {
     const filterId = cleanSensorId(sensor.location_id ?? sensor.id ?? sensor.locationId);
-    if (!filterId) return [];
     const name = cleanText(sensor.location_address || sensor.location || sensor.name || sensor.address);
+    if (!filterId || !name) return [];
     return source.kinds.map((kind) => {
       const fallback = fallbackSensorDetails(kind, filterId, name);
       return {
@@ -854,26 +765,31 @@ function normalizeRemoteSensorCatalog(payload, source) {
 }
 
 async function loadRemoteSensorCatalog() {
-  const catalogGroups = await Promise.all(remoteSensorCatalogSources.map(async (source) => {
+  const catalogResults = await Promise.all(remoteSensorCatalogSources.map(async (source) => {
     let lastError = null;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         const response = await fetchWithTimeout(sensorListUrl(source.namespace), {
-          cache: "default",
+          cache: "no-store",
           timeoutMs: catalogRequestTimeoutMs,
         });
         if (!response.ok) throw new Error(`${source.namespace.toUpperCase()} sensor list request failed with status ${response.status}`);
         const sensors = normalizeRemoteSensorCatalog(await response.json(), source);
         if (!sensors.length) throw new Error(`${source.namespace.toUpperCase()} sensor list response contained no sensors`);
-        return sensors;
+        return { namespace: source.namespace, sensors, error: null };
       } catch (error) {
         lastError = error;
       }
     }
-    console.warn(`CSENSES ${source.namespace.toUpperCase()} sensor list unavailable; using fallback locations.`, lastError);
-    return [];
+    console.warn(`CSENSES ${source.namespace.toUpperCase()} sensor list unavailable; hiding those sensor choices.`, lastError);
+    return { namespace: source.namespace, sensors: [], error: lastError };
   }));
-  return catalogGroups.flat();
+  return {
+    sensors: catalogResults.flatMap((result) => result.sensors),
+    unavailableNamespaces: catalogResults
+      .filter((result) => result.error || !result.sensors.length)
+      .map((result) => result.namespace),
+  };
 }
 
 function normalizeRemoteClusterCatalog(payload) {
@@ -915,43 +831,12 @@ async function loadClusterCatalog() {
 }
 
 async function loadSensorCatalog() {
-  const remoteCatalog = await loadRemoteSensorCatalog();
-  if (remoteCatalog.length) {
-    // Keep fallback entries only for namespaces or individual locations that the
-    // API did not return. Live records win so their current names always appear.
-    const mergedCatalog = new Map(catalogKeyedByLocation(builtInSensorCatalog).map((sensor) => [sensor.id, sensor]));
-    remoteCatalog.forEach((sensor) => mergedCatalog.set(sensor.id, sensor));
-    state.sensorCatalog = Array.from(mergedCatalog.values());
-    return;
-  }
-
-  const catalogGroups = await Promise.all(sensorCatalogSources.map(async (source) => {
-    try {
-      const response = await fetch(source.path);
-      if (!response.ok) return [];
-      const rows = parseDbf(await response.arrayBuffer());
-      return rows.map((row) => {
-        const filterId = cleanSensorId(row[source.idField]);
-        const type = cleanText(source.typeField ? row[source.typeField] : "") || source.label.replace(/s$/, "");
-        if (!filterId) return null;
-        return {
-          group: source.label,
-          id: `${source.kind}:${filterId}`,
-          filterId,
-          apiLocationId: source.kind === "air" ? legacyAqLocationIdByFilterId[filterId] || "" : filterId,
-          displayId: source.kind === "air" ? filterId : `${type} ${filterId}`,
-          name: cleanText(row[source.nameField]),
-          latitude: toNumber(row.Latitude),
-          longitude: toNumber(row.Longitude),
-        };
-      }).filter(Boolean);
-    } catch (error) {
-      return [];
-    }
-  }));
-
-  const loadedCatalog = catalogGroups.flat();
-  if (loadedCatalog.length) state.sensorCatalog = catalogKeyedByLocation(loadedCatalog);
+  const result = await loadRemoteSensorCatalog();
+  // API catalogs are authoritative for both membership and display names.
+  // If a namespace is unavailable, omit its sensor choices instead of showing
+  // names from a stale local snapshot.
+  state.sensorCatalog = result.sensors;
+  return result;
 }
 
 function normalizeRows(csvRows) {
@@ -4535,24 +4420,31 @@ els.pictureSelect.addEventListener("change", () => {
 function registerBoxPhotoOptions() {
   boxPhotoIds.forEach((boxId) => {
     const pictureKey = `box${boxId}`;
-    if (Array.from(els.pictureSelect.options).some((option) => option.value === pictureKey)) return;
-    const sensor = builtInSensorCatalog.find((item) => {
-      const kind = item.id.split(":")[0];
-      return (kind === "heat" || kind === "noise") && Number(item.filterId) === boxId;
-    });
     const apiLocationId = legacyNuLocationIdBySensorId[String(boxId)] || String(boxId);
-    const currentName = fallbackSensorNameByApiLocation.nu[apiLocationId] || sensor?.name;
-    const label = currentName ? `${currentName} (Box ${boxId})` : `Box ${boxId}`;
-    els.pictureSelect.append(new Option(label, pictureKey));
+    const sensor = state.sensorCatalog.find((item) => {
+      const kind = item.id.split(":")[0];
+      return (kind === "heat" || kind === "noise") && item.filterId === apiLocationId;
+    });
+    if (!sensor?.name) return;
+    const label = `${sensor.name} (Box ${boxId})`;
+    const existingOption = Array.from(els.pictureSelect.options).find((option) => option.value === pictureKey);
+    if (existingOption) existingOption.textContent = label;
+    else els.pictureSelect.append(new Option(label, pictureKey));
   });
 }
 
-registerBoxPhotoOptions();
-
-const pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
+let pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
   value: option.value,
   label: option.textContent,
 }));
+
+function refreshPictureOptionsFromSensorCatalog() {
+  registerBoxPhotoOptions();
+  pictureOptions = Array.from(els.pictureSelect.options).map((option) => ({
+    value: option.value,
+    label: option.textContent,
+  }));
+}
 const selectedAirSensorFallbackValue = "selectedAirSensorFallback";
 
 const pictureKeyBySensorName = new Map([
@@ -4818,18 +4710,25 @@ document.getElementById("printBtn").addEventListener("click", async () => {
 
 setupSnapshotMapInteractions();
 setCurrentPeriodDefaults();
-state.sensorCatalog = catalogKeyedByLocation(builtInSensorCatalog);
 state.clusterCatalog = builtInClusterCatalog.map((cluster) => ({ ...cluster }));
 loadSampleData();
 preloadPictureAssets();
 setTemplate(state.template);
+setDataStatus("Loading current sensor lists…", "neutral");
 loadClusterCatalog().then(() => {
   updateClusterOptions(els.location.value);
   render();
 });
-loadSensorCatalog().then(() => {
-  updateClusterOptions(els.location.value);
+loadSensorCatalog().then(({ unavailableNamespaces }) => {
+  updateClusterOptions(defaultPreferredLocationValue());
+  refreshPictureOptionsFromSensorCatalog();
   syncPictureToSensorSelection(els.location.value);
+  if (unavailableNamespaces.length) {
+    const labels = unavailableNamespaces.map((namespace) => namespace === "aq" ? "air-quality" : "heat/noise");
+    setDataStatus(`Could not load the current ${labels.join(" and ")} sensor list. Those sensor choices are unavailable; refresh the page to retry.`, "error");
+  } else {
+    updateDataStatusForSelection();
+  }
   render();
 });
 
