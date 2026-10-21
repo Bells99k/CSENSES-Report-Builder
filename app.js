@@ -6,6 +6,7 @@ const state = {
   sensorPictureFallback: null,
   builtInImages: {},
   sensorCatalog: [],
+  sensorCatalogLoading: true,
   clusterCatalog: [],
   dataSource: "sample",
   comparisonLocations: [],
@@ -130,7 +131,7 @@ const cartoBasemapSubdomains = "abcd";
 const mapTileUrlTemplate = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png";
 const apiRequestTimeoutMs = 100000;
 const apiBatchTimeoutMs = 100000;
-const catalogRequestTimeoutMs = 10000;
+const catalogRequestTimeoutMs = 30000;
 const maxConcurrentSensorRequests = 4;
 const builtInClusterCatalog = [
   { id: "1", clusterId: "1", name: "Pasadena, Supple, Columbia Roads Neighborhood Association" },
@@ -689,7 +690,12 @@ function cleanSensorId(value) {
 }
 
 function sensorListUrl(namespace) {
-  return `${sensorDataApiBaseUrl}/${namespace}/sensors-list`;
+  const url = new URL(`${sensorDataApiBaseUrl}/${namespace}/sensors-list`);
+  // A unique URL bypasses cached catalog responses while preserving a simple
+  // cross-origin GET. Fetch's `cache: "no-store"` can trigger a CORS preflight,
+  // which the sensor API does not currently authorize.
+  url.searchParams.set("catalog_request", String(Date.now()));
+  return url.toString();
 }
 
 function sensorReadingsUrl(namespace) {
@@ -770,7 +776,7 @@ async function loadRemoteSensorCatalog() {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
         const response = await fetchWithTimeout(sensorListUrl(source.namespace), {
-          cache: "no-store",
+          cache: "default",
           timeoutMs: catalogRequestTimeoutMs,
         });
         if (!response.ok) throw new Error(`${source.namespace.toUpperCase()} sensor list request failed with status ${response.status}`);
@@ -836,6 +842,7 @@ async function loadSensorCatalog() {
   // If a namespace is unavailable, omit its sensor choices instead of showing
   // names from a stale local snapshot.
   state.sensorCatalog = result.sensors;
+  state.sensorCatalogLoading = false;
   return result;
 }
 
@@ -1266,9 +1273,20 @@ function defaultLocationValue(options) {
 
 function updateClusterOptions(preferredCluster = els.location.value) {
   const options = locationOptions();
+  const sensorOptions = options.filter((option) => option.kind === "sensor");
   populateClusterSelect(els.location, options);
-  populateClusterSelect(els.sensorLocation, options.filter((option) => option.kind === "sensor"));
+  populateClusterSelect(els.sensorLocation, sensorOptions);
   populateClusterSelect(els.clusterLocation, options.filter((option) => option.kind === "cluster"));
+
+  if (!sensorOptions.length) {
+    const label = state.sensorCatalogLoading
+      ? "Loading current sensor locations…"
+      : "Current sensor list unavailable";
+    const placeholder = new Option(label, "");
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    els.sensorLocation.append(placeholder);
+  }
 
   const selectedValue = resolvePreferredLocation(preferredCluster, options);
   if (!selectedValue) return;
@@ -4715,6 +4733,7 @@ loadSampleData();
 preloadPictureAssets();
 setTemplate(state.template);
 setDataStatus("Loading current sensor lists…", "neutral");
+if (els.loadApiBtn) els.loadApiBtn.disabled = true;
 loadClusterCatalog().then(() => {
   updateClusterOptions(els.location.value);
   render();
@@ -4723,6 +4742,7 @@ loadSensorCatalog().then(({ unavailableNamespaces }) => {
   updateClusterOptions(defaultPreferredLocationValue());
   refreshPictureOptionsFromSensorCatalog();
   syncPictureToSensorSelection(els.location.value);
+  if (els.loadApiBtn) els.loadApiBtn.disabled = false;
   if (unavailableNamespaces.length) {
     const labels = unavailableNamespaces.map((namespace) => namespace === "aq" ? "air-quality" : "heat/noise");
     setDataStatus(`Could not load the current ${labels.join(" and ")} sensor list. Those sensor choices are unavailable; refresh the page to retry.`, "error");
