@@ -871,7 +871,7 @@ function normalizeRows(csvRows) {
 }
 
 function cleanText(value) {
-  return value ? value.trim() : "";
+  return value === null || value === undefined ? "" : String(value).trim();
 }
 
 function cleanDate(value) {
